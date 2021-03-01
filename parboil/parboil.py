@@ -226,11 +226,7 @@ def use(ctx, out, template):
 				log_info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
 			else:
 				if type(val) == dict:
-					# Handle complex field types
-					if 'type' in val:
-						# File-Select type
-						if val['type'] == 'file-select':
-							pass
+					pass
 				elif type(val) == type([]): # TODO: Seems wrong as a test for lists?
 					if len(val) > 1:
 						log_question(f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', echo=True)
@@ -298,22 +294,3 @@ def use(ctx, out, template):
 				click.echo(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Skipped {Style.BRIGHT}{path_render}{Style.RESET_ALL} due to empty content')
 
 	click.echo(f'[{Fore.GREEN}✓{Style.RESET_ALL}] Generated project template "{Fore.CYAN}{template}{Style.RESET_ALL}" in {Style.BRIGHT}{out}{Style.RESET_ALL}')
-
-
-def handle_file_select( key, descr ):
-	"""
-	Helper method to handle advanced value type "file-select".
-	"""
-	# Get field description
-	values   = descr.get('value', [])
-	default  = descr.get('default', 1)
-	filename = descr.get('default', None)
-
-	if values:
-		log_question(f'Select a file to include for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', echo=True)
-		for n,choice in enumerate(values):
-			log_line(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} -  "{choice}"')
-		n = click.prompt(f'    Select from 1..{len(values)}', default=default)
-		return values[n-1]
-	else:
-		return None

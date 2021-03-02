@@ -40,31 +40,25 @@ if cfg_file.exists():
 		BOIL_CONFIG = {**BOIL_CONFIG, **config_from_file}
 
 
-TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
-
-
 
 # Some helper
-def log( msg, echo=click.echo, decor=None ):
-	if decor != None:
-		decor += ' '
-
+def log( msg, echo=click.echo, decor='' ):
 	if callable(echo):
 		return echo(f'{decor}{msg}')
 	else:
 		return f'{decor}{msg}'
 
 def log_info( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.BLUE}{Style.BRIGHT}i{Style.RESET_ALL}]')
+	return log(msg, echo=echo, decor=f'[{Fore.BLUE}{Style.BRIGHT}i{Style.RESET_ALL}] ')
 
 def log_warn( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.YELLOW}{Style.BRIGHT}!{Style.RESET_ALL}]')
+	return log(msg, echo=echo, decor=f'[{Fore.YELLOW}{Style.BRIGHT}!{Style.RESET_ALL}] ')
 
 def log_error( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.RED}{Style.BRIGHT}X{Style.RESET_ALL}]')
+	return log(msg, echo=echo, decor=f'[{Fore.RED}{Style.BRIGHT}X{Style.RESET_ALL}] ')
 
 def log_success( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.GREEN}{Style.BRIGHT}✓{Style.RESET_ALL}]')
+	return log(msg, echo=echo, decor=f'[{Fore.GREEN}{Style.BRIGHT}✓{Style.RESET_ALL}] ')
 
 def log_line( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor='    ')
@@ -94,6 +88,7 @@ def boil(config):
 def list():
 	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 	if TPL_DIR.exists():
+		log_info(f'Listing templates in {Style.BRIGHT}{TPL_DIR}{Style.RESET_ALL}.')
 		folders = [str(p) for p in TPL_DIR.iterdir()]
 		if len(folders) > 0:
 			for child in sorted(folders):
@@ -282,7 +277,7 @@ def use(ctx, out, template, force, merge):
 					pass
 				elif type(val) == type([]): # TODO: Seems wrong as a test for lists?
 					if len(val) > 1:
-						log_question(f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
+						log_question(f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', echo=click.echo)
 						for n,choice in enumerate(val):
 							log_line(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} -  "{choice}"')
 						n = click.prompt(log_line(f'Select from 1..{len(val)}', echo=None), default=1)

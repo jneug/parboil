@@ -8,6 +8,8 @@ Run boil --help for more info.
 """
 
 import os
+import re
+import subprocess
 import json
 import shutil
 from pathlib import Path
@@ -44,10 +46,15 @@ TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 
 # Some helper
 def log( msg, echo=True, decor='' ):
-	if echo:
-		click.echo(f'{decor} {msg}')
+	if decor != '':
+		decor += ' '
+
+	if echo == True:
+		return click.echo(f'{decor}{msg}')
+	elif echo:
+		return echo(f'{decor}{msg}')
 	else:
-		return f'{decor} {msg}'
+		return f'{decor}{msg}'
 
 def log_info( msg, echo=True ):
 	return log(msg, echo=echo, decor=f'[{Fore.BLUE}{Style.BRIGHT}i{Style.RESET_ALL}]')
@@ -83,36 +90,53 @@ def list():
 		if len(folders) > 0:
 			for child in sorted(folders):
 				tpl_name = os.path.basename(child)
-				click.echo(f'    {Fore.CYAN}{tpl_name}{Style.RESET_ALL}')
+				log_line(f'{Fore.CYAN}{tpl_name}{Style.RESET_ALL}')
 		else:
-			click.echo(f'[{Fore.YELLOW}!{Style.RESET_ALL}] No templates installed yet.')
+			log_info('No templates installed yet.')
 	else:
-		click.echo(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Template folder does not exist.')
-
+		log_warn('Template folder does not exist.')
 
 
 @boil.command()
-@click.option('-f', '--force', is_flag=True)
+@click.option('-f', '--force', is_flag=True,
+		help='Set this flag to overwrite existing templates named TEMPLATE without prompting.')
+@click.option('-d', '--download', is_flag=True,
+		help='Set this flag if SOURCE is a github repository to download instead of a local directory.')
 @click.argument('source')
 @click.argument('template')
 @click.pass_context
-def install(ctx, source, template, force):
+def install(ctx, source, template, force, download):
+	"""
+	Install a project template named TEMPLATE from SOURCE to the local template repository.
+
+	SOURCE may be a local directory or the url of a GitHub repository. You may also pass in
+	the name of a repository in the form user/repo, but need to set the -d flag to indicate
+	it isn't a local directory.
+	"""
 	# TODO: validate templates!
 	# TODO: handle both github urls and local directories
-	source_dir = Path(source).resolve()
-	project_file = source_dir / 'project.json'
-	template_dir = source_dir / 'template'
+	if re.match(r'https?://(www\.)?github\.com', source):
+		download = True
+	if download:
+		# TODO: validate github urls
+		if re.match('[A-Za-z_-]+/[A-Za-z_-]+', source):
+			source = f'https://github.com/{source}'
+	else:
+		source = Path(source).resolve()
+		project_file = source / 'project.json'
+		template_dir = source / 'template'
+
+		if not source.is_dir():
+			log_error('Source does not exist', echo=ctx.fail)
+
+		if not project_file.is_file():
+			log_error('The source directory does not contain a project.json file', echo=ctx.fail)
+
+		if not template_dir.is_dir():
+			log_error('The source directory does not contain a template directory', echo=ctx.fail)
+
+	# Check target dir
 	tpl_dir = TPL_DIR  / template
-
-	if not source_dir.is_dir():
-		ctx.fail(f'[{Fore.RED}!{Style.RESET_ALL}] Source does not exist')
-
-	if not project_file.is_file():
-		ctx.fail(f'[{Fore.RED}!{Style.RESET_ALL}] The source directory does not contain a project.json file')
-
-	if not template_dir.is_dir():
-		ctx.fail(f'[{Fore.RED}!{Style.RESET_ALL}] The source directory does not contain a template directory')
-
 	if tpl_dir.is_dir():
 		rm = force
 		if not force:
@@ -120,20 +144,26 @@ def install(ctx, source, template, force):
 		if rm:
 			try:
 				shutil.rmtree(str(tpl_dir))
-			except:
-				click.echo(f'[{Fore.RED}!{Style.RESET_ALL}] Error while removing template {Fore.CYAN}{template}{Style.RESET_ALL}')
-				click.echo(f'    You might need to manually delete the template directory at')
-				click.echo(f'    {Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
+				log_success(f'Removed template {Fore.CYAN}{template}{Style.RESET_ALL}')
+			except shutil.Error:
+				log_error(f'Error while removing template {Fore.CYAN}{template}{Style.RESET_ALL}')
+				log_line('You might need to manually delete the template directory at')
+				log_line(f'{Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
 				ctx.exit(1)
 		else:
 			ctx.exit(1)
 
 	try:
-		shutil.copytree(source_dir, tpl_dir)
-		click.echo(f'[{Fore.GREEN}✓{Style.RESET_ALL}] Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
-		click.echo(f'    Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
-	except:
-		ctx.fail(f'[{Fore.RED}!{Style.RESET_ALL}] Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}')
+		if download:
+			# TODO: Does this work on windows?
+			git = subprocess.Popen(['git', 'clone', str(source), str(tpl_dir)])
+			git.wait(30)
+		else:
+			shutil.copytree(source, tpl_dir)
+		log_success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
+		log_line(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
+	except shutil.Error:
+		log_error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
 
 
 
@@ -145,7 +175,8 @@ def uninstall(force, template):
 	if tpl_dir.is_dir():
 		rm = force
 		if not force:
-			rm = click.confirm(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}')
+			#rm = click.confirm(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}')
+			rm = log_warn(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=click.confirm)
 		if rm:
 			try:
 				shutil.rmtree(str(tpl_dir))

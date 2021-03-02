@@ -16,7 +16,7 @@ from pathlib import Path
 
 import click
 from colorama import Fore, Back, Style
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 from .version import __version__
 from .ext import TimeExtension
@@ -80,13 +80,19 @@ def log_question( msg, default=None, echo=click.prompt, color=Fore.BLUE ):
 # TODO: Options for debug/verbosity and colors
 @click.group()
 @click.version_option(version=__version__, prog_name='parboil')
-def boil():
-	pass
+@click.option('-c', '--config', type=click.File(),
+		help='Provides a different json config file for this run. Read from stdin with -.')
+def boil(config):
+	if config:
+		USER_CONFIG = json.load(config)
+		USER_CONFIG = {**BOIL_CONFIG, **USER_CONFIG}
+		globals()['BOIL_CONFIG'] = USER_CONFIG
 
 
 
 @boil.command()
 def list():
+	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 	if TPL_DIR.exists():
 		folders = [str(p) for p in TPL_DIR.iterdir()]
 		if len(folders) > 0:
@@ -117,6 +123,8 @@ def install(ctx, source, template, force, download):
 	"""
 	# TODO: validate templates!
 	# TODO: handle both github urls and local directories
+	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
+
 	if re.match(r'https?://(www\.)?github\.com', source):
 		download = True
 	if download:
@@ -173,6 +181,7 @@ def install(ctx, source, template, force, download):
 @click.option('-f', '--force', is_flag=True)
 @click.argument('template')
 def uninstall(force, template):
+	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 	tpl_dir = TPL_DIR  / template
 	if tpl_dir.is_dir():
 		rm = force
@@ -204,6 +213,7 @@ def use(ctx, out, template):
 
 	# copy global config for this run
 	# TODO: Setup before as context?
+	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 	local_cfg = {**BOIL_CONFIG}
 
 	# Check teamplate and read configuration
@@ -283,9 +293,17 @@ def use(ctx, out, template):
 
 	# Setup Jinja2 and render templates
 	tpl_root = TPL_DIR / template / 'template'
+	inc_root = TPL_DIR / template / 'includes'
 
 	jinja = Environment(
-		loader=FileSystemLoader(tpl_root),
+		#loader=FileSystemLoader([tpl_root, inc_root]),
+		loader=ChoiceLoader([
+			FileSystemLoader(tpl_root),
+			PrefixLoader(
+				{'includes': FileSystemLoader(inc_root)},
+				delimiter=':'
+			)
+		]),
 		extensions=[TimeExtension]
 	)
 

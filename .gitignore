@@ -1,6 +1,5 @@
 todo.md
-test/compiled/
-test/templates/
+test/out/
 
 
 # Byte-compiled / optimized / DLL files

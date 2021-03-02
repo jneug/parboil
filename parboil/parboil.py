@@ -204,9 +204,13 @@ def uninstall(force, template):
 @click.option('-o', '--out', help='The output directory.',
 		default='.', show_default=True,
 		type=click.Path(file_okay=False, dir_okay=True, writable=True))
+@click.option('-f', '--force', is_flag=True,
+		help='Force overwrite of existing output directory. If the direcotry given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
+@click.option('-m', '--merge', is_flag=True,
+		help='Merge template into existing output directory without prompting. If the direcotry given with -o exists and is not empty, the direcotry is not deleted, but old files will be overwritten with new ones generated from the template.')
 @click.argument('template')
 @click.pass_context
-def use(ctx, out, template):
+def use(ctx, out, template, force, merge):
 	"""
 	Generate a new project from TEMPLATE.
 	"""
@@ -242,8 +246,15 @@ def use(ctx, out, template):
 		out = Path(out)
 
 	if out.exists() and len(os.listdir(out)) > 0:
-		log_warn(f'The output directory exists and is not empty.')
-		answ = log_question(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
+		answ = 'a'
+		if not merge and not force:
+			log_warn(f'The output directory exists and is not empty.')
+			answ = log_question(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
+		elif merge:
+			answ = 'm'
+		elif force:
+			answ = 'o'
+
 		if answ.lower() == 'o':
 			shutil.rmtree(out)
 			out.mkdir(parents=True, exist_ok=True)

@@ -12,6 +12,7 @@ import re
 import subprocess
 import json
 import shutil
+import time
 from pathlib import Path
 
 import click
@@ -159,12 +160,19 @@ def install(ctx, source, template, force, download):
 			ctx.exit(1)
 
 	try:
+		meta = {'created': time.time(), 'source': str(source)}
 		if download:
 			# TODO: Does this work on windows?
 			git = subprocess.Popen(['git', 'clone', str(source), str(tpl_dir)])
 			git.wait(30)
+			meta['source_type'] = 'github'
 		else:
 			shutil.copytree(source, tpl_dir)
+			meta['source_type'] = 'local'
+			meta['source'] = str(source.resolve())
+		# Create .parboil for later updates
+		with open(tpl_dir / '.parboil', 'w') as f:
+			json.dump(meta, f)
 		log_success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
 		log_line(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
 	except shutil.Error:
@@ -194,13 +202,45 @@ def uninstall(force, template):
 		log_warn(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
 
 
+@boil.command()
+@click.argument('template')
+@click.pass_context
+def update(ctx, template):
+	"""
+	Update TEMPLATE from the source it was first installed from.
+	"""
+	tpl_dir = Path(BOIL_CONFIG['TPL_DIR'])  / template
+	meta_file = tpl_dir / '.parboil'
+
+	if not tpl_dir.is_dir():
+		log_error('Template does not exist.', echo=ctx.fail)
+
+	if not meta_file.is_file():
+		log_error('Template metafile does not exist. Can\'t read update information.', echo=ctx.fail)
+
+	with open(meta_file) as f:
+		meta = json.load(f)
+
+	if meta['source_type'] == 'github':
+		git = subprocess.Popen(['git', 'pull', '--rebase'], cwd=tpl_dir)
+		git.wait(30)
+		log_success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from GitHub.')
+	else:
+		shutil.rmtree(tpl_dir)
+		shutil.copytree(meta['source'], tpl_dir)
+		log_success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from local filesystem.')
+	meta['updated'] = time.time()
+	# Create .parboil for later updates
+	with open(tpl_dir / '.parboil', 'w') as f:
+		json.dump(meta, f)
+
 
 @boil.command()
 @click.option('-o', '--out', help='The output directory.',
 		default='.', show_default=True,
 		type=click.Path(file_okay=False, dir_okay=True, writable=True))
 @click.option('-f', '--force', is_flag=True,
-		help='Force overwrite of existing output directory. If the direcotry given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
+		help='Force overwrite of existing output directory. If the directory given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
 @click.option('-m', '--merge', is_flag=True,
 		help='Merge template into existing output directory without prompting. If the direcotry given with -o exists and is not empty, the direcotry is not deleted, but old files will be overwritten with new ones generated from the template.')
 @click.argument('template')

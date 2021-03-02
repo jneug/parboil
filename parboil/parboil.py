@@ -92,9 +92,27 @@ def list():
 		log_info(f'Listing templates in {Style.BRIGHT}{TPL_DIR}{Style.RESET_ALL}.')
 		folders = [str(p) for p in TPL_DIR.iterdir()]
 		if len(folders) > 0:
+			print()
+			log_line(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
+			log_line(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
 			for child in sorted(folders):
+				meta_file = Path(child) / '.parboil'
+
+				meta = dict()
+				if meta_file.is_file():
+					with open(meta_file) as f:
+						meta = json.load(f)
+				if 'updated' not in meta:
+					meta['updated'] = 'never'
+				else:
+					meta['updated'] = time.ctime(int(meta['updated']))
+				if 'created' not in meta:
+					meta['created'] = 'unknown'
+				else:
+					meta['created'] = time.ctime(int(meta['created']))
+
 				tpl_name = os.path.basename(child)
-				log_line(f'{Fore.CYAN}{tpl_name}{Style.RESET_ALL}')
+				log_line(f'| {Fore.CYAN}{tpl_name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |')
 		else:
 			log_info('No templates installed yet.')
 	else:

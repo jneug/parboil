@@ -45,34 +45,36 @@ TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 
 
 # Some helper
-def log( msg, echo=True, decor='' ):
-	if decor != '':
+def log( msg, echo=click.echo, decor=None ):
+	if decor != None:
 		decor += ' '
 
-	if echo == True:
-		return click.echo(f'{decor}{msg}')
-	elif echo:
+	if callable(echo):
 		return echo(f'{decor}{msg}')
 	else:
 		return f'{decor}{msg}'
 
-def log_info( msg, echo=True ):
+def log_info( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor=f'[{Fore.BLUE}{Style.BRIGHT}i{Style.RESET_ALL}]')
 
-def log_warn( msg, echo=True ):
+def log_warn( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor=f'[{Fore.YELLOW}{Style.BRIGHT}!{Style.RESET_ALL}]')
 
-def log_error( msg, echo=True ):
+def log_error( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor=f'[{Fore.RED}{Style.BRIGHT}X{Style.RESET_ALL}]')
 
-def log_success( msg, echo=True ):
+def log_success( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor=f'[{Fore.GREEN}{Style.BRIGHT}✓{Style.RESET_ALL}]')
 
-def log_line( msg, echo=True ):
+def log_line( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor='    ')
 
-def log_question( msg, echo=False ):
-	return log(msg, echo=echo, decor=f'[{Fore.BLUE}{Style.BRIGHT}?{Style.RESET_ALL}]')
+def log_question( msg, default=None, echo=click.prompt, color=Fore.BLUE ):
+	msg = log(msg, echo=None, decor=f'[{color}{Style.BRIGHT}?{Style.RESET_ALL}]')
+	if default:
+		return echo(msg, default=default)
+	else:
+		return echo(msg)
 
 
 # TODO: Options for debug/verbosity and colors
@@ -140,7 +142,7 @@ def install(ctx, source, template, force, download):
 	if tpl_dir.is_dir():
 		rm = force
 		if not force:
-			rm = click.confirm(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}')
+			rm = log_question(f'Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
 		if rm:
 			try:
 				shutil.rmtree(str(tpl_dir))
@@ -175,18 +177,17 @@ def uninstall(force, template):
 	if tpl_dir.is_dir():
 		rm = force
 		if not force:
-			#rm = click.confirm(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}')
-			rm = log_warn(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=click.confirm)
+			rm = log_question(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
 		if rm:
 			try:
 				shutil.rmtree(str(tpl_dir))
-				click.echo(f'[{Fore.GREEN}✓{Style.RESET_ALL}] Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
+				log_success(f'Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
 			except:
-				click.echo(f'[{Fore.RED}!{Style.RESET_ALL}] Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}')
-				click.echo(f'    You might need to manually delete the template directory at')
-				click.echo(f'    {Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
+				log_error(f'Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}')
+				log_line(f'You might need to manually delete the template directory at')
+				log_line(f'{Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
 	else:
-		click.echo(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
+		log_warn(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
 
 
 
@@ -232,7 +233,7 @@ def use(ctx, out, template):
 
 	if out.exists() and len(os.listdir(out)) > 0:
 		log_warn(f'The output directory exists and is not empty.')
-		answ = click.prompt(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
+		answ = log_question(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
 		if answ.lower() == 'o':
 			shutil.rmtree(out)
 			out.mkdir(parents=True, exist_ok=True)
@@ -260,10 +261,10 @@ def use(ctx, out, template):
 					pass
 				elif type(val) == type([]): # TODO: Seems wrong as a test for lists?
 					if len(val) > 1:
-						log_question(f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', echo=True)
+						log_question(f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
 						for n,choice in enumerate(val):
 							log_line(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} -  "{choice}"')
-						n = click.prompt(f'    Select from 1..{len(val)}', default=1)
+						n = click.prompt(log_line(f'Select from 1..{len(val)}', echo=None), default=1)
 						if n > len(val):
 							log_warn(f'{n} is not a valid choice. Using default.')
 							n = 1
@@ -273,11 +274,11 @@ def use(ctx, out, template):
 					variables[f'{key}_index'] = n-1
 				elif type(val) is bool:
 					if val:
-						variables[key] = not click.confirm(log_question(f'Do you want do disable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"'))
+						variables[key] = not log_question(f'Do you want do disable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
 					else:
-						variables[key] = click.confirm(log_question(f'Do you want do enable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"'))
+						variables[key] = log_question(f'Do you want do enable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
 				else:
-					variables[key] = click.prompt(log_question(f'Enter a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"'), default=val)
+					variables[key] = log_question(f'Enter a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', default=val)
 
 
 	# Setup Jinja2 and render templates
@@ -320,8 +321,8 @@ def use(ctx, out, template):
 
 				with open(out / path_render, 'w') as f:
 					f.write(tpl_render)
-				click.echo(f'[{Fore.GREEN}✓{Style.RESET_ALL}] Created {Style.BRIGHT}{path_render}{Style.RESET_ALL}')
+				log_success(f'Created {Style.BRIGHT}{path_render}{Style.RESET_ALL}')
 			else:
-				click.echo(f'[{Fore.YELLOW}!{Style.RESET_ALL}] Skipped {Style.BRIGHT}{path_render}{Style.RESET_ALL} due to empty content')
+				log_warn(f'Skipped {Style.BRIGHT}{path_render}{Style.RESET_ALL} due to empty content')
 
-	click.echo(f'[{Fore.GREEN}✓{Style.RESET_ALL}] Generated project template "{Fore.CYAN}{template}{Style.RESET_ALL}" in {Style.BRIGHT}{out}{Style.RESET_ALL}')
+	log_success(f'Generated project template "{Fore.CYAN}{template}{Style.RESET_ALL}" in {Style.BRIGHT}{out}{Style.RESET_ALL}')

@@ -1,0 +1,28 @@
+{
+		"Jgst": [
+			"Q1",
+			"Q2",
+			"EF"
+		],
+		"LK": false,
+		"Nr": 1,
+		"Datum": "",
+		"Reihe": "",
+		"Fach": [
+			"Mathematik",
+			"Informatik"
+		],
+		"Name": "J. Neugebauer",
+		"Kuerzel": "Ngb",
+		"Dauer": [
+			90, 135, 180, 225, 270
+		],
+		"Hmft": {
+			"condition": ["{{Fach}}", "==", "Mathematik"],
+			"type": "dependent",
+			"key":  "Dauer",
+			"values": [
+				90, 135, 180, 225, 270
+			]
+		}
+}

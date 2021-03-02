@@ -1,0 +1,12 @@
+{
+    "Project": "Test",
+    "Name": "My Name",
+    "Foo": [1,2,3,4],
+    "HelperFile": {
+    	"type": "file-select",
+    	"value": [
+    		"a.txt", "b.txt", "c.txt"
+    	],
+    	"filename": "LICENSE"
+    }
+}

@@ -1,0 +1,10 @@
+Project: {{ Project }}
+Name: {{ Name }}
+
+Foo: {{ Foo }}
+FooIdx: {{ Foo_index }}
+
+HelperFile: {{ HelperFile }}
+
+{% extends "includes:base.txt" %}
+

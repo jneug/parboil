@@ -6,6 +6,11 @@ from jinja2 import nodes
 from jinja2.ext import Extension
 
 class JinjaTimeExtension(Extension):
+	"""
+	Adds a {% time %} tag to jinja2
+
+	The argument gets passed to time.strftime.
+	"""
 	tags = {"time"}
 
 	def __init__(self, environment):

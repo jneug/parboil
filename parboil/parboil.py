@@ -82,6 +82,7 @@ def boil(config):
 	if config:
 		USER_CONFIG = json.load(config)
 		USER_CONFIG = {**BOIL_CONFIG, **USER_CONFIG}
+		# Store config for this run in config
 		globals()['BOIL_CONFIG'] = USER_CONFIG
 
 
@@ -325,12 +326,16 @@ def use(ctx, template, out, hard):
 
 
 	# Prepare store for variables
+	if 'fields' not in project:
+		project['fields'] = dict()
+	if 'files' not in project:
+		project['files'] = dict()
 	variables = dict()
 
 	# Read user input (if necessary)
-	if len(project) > 0:
+	if len(project['fields']) > 0:
 		prefilled = BOIL_CONFIG['prefilled'] if 'prefilled' in BOIL_CONFIG else dict()
-		for key, val in project.items():
+		for key, val in project['fields'].items():
 			if key in prefilled:
 				variables[key] = prefilled[key]
 				log_info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
@@ -379,9 +384,14 @@ def use(ctx, template, out, hard):
 	for root, dirs, files in os.walk(tpl_root):
 		root = Path(root).resolve()
 		for name in files:
-			dirname = os.path.relpath(root, start=tpl_root)
-			path = os.path.join(dirname, name)
-			#print(f'[{Fore.GREEN}-{Style.RESET_ALL}] Working on {Style.BRIGHT}{path}{Style.RESET_ALL}')
+			dirname  = os.path.relpath(root, start=tpl_root)
+			dirname  = '' if dirname == '.' else dirname
+			path_in  = os.path.join(dirname, name)
+			path_out = path_in
+			if path_in in project['files']:
+				if type(project['files'][path_in]) is str:
+					path_out = os.path.join(dirname, project['files'][path_in])
+			#log_info(f'Working on {Style.BRIGHT}{path}{Style.RESET_ALL}')
 
 			# Set some dynamic values
 			variables['BOIL'] = dict(
@@ -392,11 +402,12 @@ def use(ctx, template, out, hard):
 			)
 
 			# TODO: Escape vars for safe filenames
-			path_render = jinja.from_string(path).render(**variables)
+			path_render = jinja.from_string(path_out).render(**variables)
 			variables['BOIL']['FILENAME'] = os.path.basename(path_render)
+			variables['BOIL']['FILEPATH'] = path_render
 
 			# Render template
-			tpl_render  = jinja.get_template(path).render(**variables)
+			tpl_render  = jinja.get_template(path_in).render(**variables)
 
 			if local_cfg['trim_content']:
 				tpl_render = tpl_render.strip()

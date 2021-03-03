@@ -26,7 +26,8 @@ from .ext import JinjaTimeExtension
 
 # Load global config
 BOIL_CONFIG = dict(
-	TPL_DIR = str(Path.home() / '.config' / 'pylr' / 'templates'),
+	TPL_DIR = str(Path.home() / '.config' / 'parboil' / 'templates'),
+	META_FILE = '.parboil',
 	trim_content = True,
 	keep_empty_files = False,
 	sort_prompts = False
@@ -34,7 +35,7 @@ BOIL_CONFIG = dict(
 
 # Load config
 # TODO: use click.get_app_dir to be plattform independent
-cfg_file = Path.home() /  '.config' / 'pylr' / 'config.json'
+cfg_file = Path.home() /  '.config' / 'parboil' / 'config.json'
 if cfg_file.exists():
 	with open(cfg_file) as f:
 		config_from_file = json.load(f)
@@ -96,7 +97,7 @@ def list():
 			log_line(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
 			log_line(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
 			for child in sorted(folders):
-				meta_file = Path(child) / '.parboil'
+				meta_file = Path(child) / BOIL_CONFIG['META_FILE']
 
 				meta = dict()
 				if meta_file.is_file():
@@ -189,7 +190,7 @@ def install(ctx, source, template, force, download):
 			meta['source_type'] = 'local'
 			meta['source'] = str(source.resolve())
 		# Create .parboil for later updates
-		with open(tpl_dir / '.parboil', 'w') as f:
+		with open(tpl_dir / BOIL_CONFIG['META_FILE'], 'w') as f:
 			json.dump(meta, f)
 		log_success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
 		log_line(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
@@ -228,7 +229,7 @@ def update(ctx, template):
 	Update TEMPLATE from the source it was first installed from.
 	"""
 	tpl_dir = Path(BOIL_CONFIG['TPL_DIR'])  / template
-	meta_file = tpl_dir / '.parboil'
+	meta_file = tpl_dir / BOIL_CONFIG['META_FILE']
 
 	if not tpl_dir.is_dir():
 		log_error('Template does not exist.', echo=ctx.fail)

@@ -5,11 +5,11 @@ from datetime import datetime
 from jinja2 import nodes
 from jinja2.ext import Extension
 
-class TimeExtension(Extension):
+class JinjaTimeExtension(Extension):
 	tags = {"time"}
 
 	def __init__(self, environment):
-		super(TimeExtension, self).__init__(environment)
+		super(JinjaTimeExtension, self).__init__(environment)
 
 		environment.extend(datetime_format='%Y-%m-%d')
 

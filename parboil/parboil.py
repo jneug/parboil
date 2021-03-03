@@ -20,7 +20,7 @@ from colorama import Fore, Back, Style
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 from .version import __version__
-from .ext import TimeExtension
+from .ext import JinjaTimeExtension
 
 
 

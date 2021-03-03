@@ -114,6 +114,7 @@ def list():
 
 				tpl_name = os.path.basename(child)
 				log_line(f'| {Fore.CYAN}{tpl_name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |')
+			print()
 		else:
 			log_info('No templates installed yet.')
 	else:
@@ -126,7 +127,7 @@ def list():
 @click.option('-d', '--download', is_flag=True,
 		help='Set this flag if SOURCE is a github repository to download instead of a local directory.')
 @click.argument('source')
-@click.argument('template')
+@click.argument('template', required=False)
 @click.pass_context
 def install(ctx, source, template, force, download):
 	"""

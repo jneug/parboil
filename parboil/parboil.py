@@ -369,7 +369,7 @@ def use(ctx, out, template, force, merge):
 				delimiter=':'
 			)
 		]),
-		extensions=[TimeExtension]
+		extensions=[JinjaTimeExtension]
 	)
 
 	# TODO: use pathlib

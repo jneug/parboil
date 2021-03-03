@@ -66,7 +66,7 @@ def log_line( msg, echo=click.echo ):
 	return log(msg, echo=echo, decor='    ')
 
 def log_question( msg, default=None, echo=click.prompt, color=Fore.BLUE ):
-	msg = log(msg, echo=None, decor=f'[{color}{Style.BRIGHT}?{Style.RESET_ALL}]')
+	msg = log(msg, echo=None, decor=f'[{color}{Style.BRIGHT}?{Style.RESET_ALL}] ')
 	if default:
 		return echo(msg, default=default)
 	else:

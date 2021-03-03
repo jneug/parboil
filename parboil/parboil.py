@@ -20,7 +20,7 @@ from colorama import Fore, Back, Style
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 from .version import __version__
-from .ext import JinjaTimeExtension
+from .ext import JinjaTimeExtension, jinja_filter_filename, jinja_filter_sluggify
 
 
 
@@ -374,6 +374,8 @@ def use(ctx, template, out, hard):
 		]),
 		extensions=[JinjaTimeExtension]
 	)
+	jinja.filters['filename'] = jinja_filter_filename
+	jinja.filters['slug'] = jinja_filter_sluggify
 
 	# TODO: use pathlib
 	for root, dirs, files in os.walk(tpl_root):

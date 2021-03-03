@@ -32,3 +32,10 @@ class JinjaTimeExtension(Extension):
     )
 
 		return nodes.Output([call_method], lineno=lineno)
+
+
+def jinja_filter_filename( value ):
+	return f'filename:{value}'
+
+def jinja_filter_sluggify( value ):
+	return f'sluggify:{value}'

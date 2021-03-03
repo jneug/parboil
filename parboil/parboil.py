@@ -147,6 +147,8 @@ def install(ctx, source, template, force, download):
 		# TODO: validate github urls
 		if re.match('[A-Za-z_-]+/[A-Za-z_-]+', source):
 			source = f'https://github.com/{source}'
+		if not template:
+			template = source.split('/')[-1]
 	else:
 		source = Path(source).resolve()
 		project_file = source / 'project.json'
@@ -160,6 +162,9 @@ def install(ctx, source, template, force, download):
 
 		if not template_dir.is_dir():
 			log_error('The source directory does not contain a template directory', echo=ctx.fail)
+
+		if not template:
+			template = source.name
 
 	# Check target dir
 	tpl_dir = TPL_DIR  / template
@@ -256,18 +261,25 @@ def update(ctx, template):
 
 
 @boil.command()
-@click.option('-o', '--out', help='The output directory.',
-		default='.', show_default=True,
-		type=click.Path(file_okay=False, dir_okay=True, writable=True))
-@click.option('-f', '--force', is_flag=True,
-		help='Force overwrite of existing output directory. If the directory given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
-@click.option('-m', '--merge', is_flag=True,
-		help='Merge template into existing output directory without prompting. If the direcotry given with -o exists and is not empty, the direcotry is not deleted, but old files will be overwritten with new ones generated from the template.')
+#@click.option('-o', '--out', help='The output directory.',
+#		default='.', show_default=True,
+#		type=click.Path(file_okay=False, dir_okay=True, writable=True))
+#@click.option('-f', '--force', is_flag=True,
+#		help='Force overwrite of existing output directory. If the directory given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
+@click.option('--hard', is_flag=True,
+		help='Force overwrite of existing output directory. If the directory OUT exists and is not empty, it will be deleted and newly created.')
+#@click.option('-m', '--merge', is_flag=True,
+#		help='Merge template into existing output directory without prompting. If the direcotry given with -o exists and is not empty, the direcotry is not deleted, but old files will be overwritten with new ones generated from the template.')
 @click.argument('template')
+@click.argument('out', default='.',
+	type=click.Path(file_okay=False, dir_okay=True, writable=True))
 @click.pass_context
-def use(ctx, out, template, force, merge):
+def use(ctx, template, out, hard):
 	"""
 	Generate a new project from TEMPLATE.
+
+	If OUT is given and a directory, the template is created there.
+	Otherwise the cwd is used.
 	"""
 
 	# copy global config for this run
@@ -301,24 +313,14 @@ def use(ctx, out, template, force, merge):
 		out = Path(out)
 
 	if out.exists() and len(os.listdir(out)) > 0:
-		answ = 'a'
-		if not merge and not force:
-			log_warn(f'The output directory exists and is not empty.')
-			answ = log_question(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
-		elif merge:
-			answ = 'm'
-		elif force:
-			answ = 'o'
-
-		if answ.lower() == 'o':
+		#log_warn(f'The output directory exists and is not empty.')
+			#answ = log_question(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
+		if hard:
 			shutil.rmtree(out)
-			out.mkdir(parents=True, exist_ok=True)
+			out.mkdir(parents=True)
 			log_success(f'Cleared {Style.BRIGHT}{out}{Style.RESET_ALL}')
-		elif answ.lower() == 'a':
-			ctx.abort()
-			return
 	elif not out.exists():
-		out.mkdir(parents=True, exist_ok=True)
+		out.mkdir(parents=True)
 		log_success(f'Created {Style.BRIGHT}{out}{Style.RESET_ALL}')
 
 

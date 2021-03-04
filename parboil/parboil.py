@@ -266,20 +266,15 @@ def update(ctx, template):
 
 
 @boil.command()
-#@click.option('-o', '--out', help='The output directory.',
-#		default='.', show_default=True,
-#		type=click.Path(file_okay=False, dir_okay=True, writable=True))
-#@click.option('-f', '--force', is_flag=True,
-#		help='Force overwrite of existing output directory. If the directory given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
 @click.option('--hard', is_flag=True,
 		help='Force overwrite of existing output directory. If the directory OUT exists and is not empty, it will be deleted and newly created.')
-#@click.option('-m', '--merge', is_flag=True,
-#		help='Merge template into existing output directory without prompting. If the direcotry given with -o exists and is not empty, the direcotry is not deleted, but old files will be overwritten with new ones generated from the template.')
+@click.option('-v', '--value', multiple=True, nargs=2,
+	  help='Sets a prefilled value for the template.')
 @click.argument('template')
 @click.argument('out', default='.',
 	type=click.Path(file_okay=False, dir_okay=True, writable=True))
 @click.pass_context
-def use(ctx, template, out, hard):
+def use(ctx, template, out, hard, value):
 	"""
 	Generate a new project from TEMPLATE.
 
@@ -328,7 +323,12 @@ def use(ctx, template, out, hard):
 
 	# Read user input (if necessary)
 	if len(project['fields']) > 0:
+		# Prepare dict for prefilled values
 		prefilled = cfg['prefilled'] if 'prefilled' in cfg else dict()
+		if value:
+			for k, v in value:
+				prefilled[k] = v
+
 		for key, val in project['fields'].items():
 			if key in prefilled:
 				variables[key] = prefilled[key]

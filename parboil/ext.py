@@ -1,9 +1,23 @@
 # -*- coding: utf-8 -*-
 
 from datetime import datetime
+from functools import update_wrapper
+
+from click import pass_context
 
 from jinja2 import nodes
 from jinja2.ext import Extension
+
+
+def pass_tpldir(f):
+	@pass_context
+	def new_func(ctx, *args, **kwargs):
+		if ctx.obj and 'TPLDIR' in ctx.obj:
+			return ctx.invoke(f, ctx.obj['TPLDIR'], *args, **kwargs)
+		else:
+			return ctx.invoke(f, ctx.obj['TPLDIR'], *args, **kwargs)
+	return update_wrapper(new_func, f)
+
 
 class JinjaTimeExtension(Extension):
 	"""

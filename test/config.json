@@ -1,3 +1,6 @@
 {
-	"TPLDIR": "./test/repo"
+	"TPLDIR": "./test/repo",
+	"prefilled": {
+		"Name": "Jonas the Neugebauer"
+	}
 }

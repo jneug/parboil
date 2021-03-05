@@ -23,7 +23,7 @@ import parboil.console as console
 import parboil.fields as fields
 
 from .version import __version__
-from .project import Project
+from .project import Project, Repository
 from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
 
 
@@ -95,38 +95,39 @@ def boil(ctx, config, tpldir):
 
 
 @boil.command()
+@click.option('-p', '--plain', is_flag=True)
 @pass_tpldir
-def list(TPLDIR):
-	if TPLDIR.exists():
-		log_info(f'Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}.')
-		folders = [str(p) for p in TPLDIR.iterdir()]
-		if len(folders) > 0:
-			print()
-			log_line(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
-			log_line(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
-			for child in sorted(folders):
-				meta_file = Path(child) / META_FILE
+def list(TPLDIR, plain):
+	repo = Repository(TPLDIR)
+	if repo.exists():
+		if len(repo) > 0:
+			if plain:
+				for project in repo:
+					click.echo(project)
+			else:
+				console.info(f'Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}.')
+				print()
+				console.indent(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
+				console.indent(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
+				for project in repo.projects():
+					project.setup(load_project=True)
 
-				meta = dict()
-				if meta_file.is_file():
-					with open(meta_file) as f:
-						meta = json.load(f)
-				if 'updated' not in meta:
-					meta['updated'] = 'never'
-				else:
-					meta['updated'] = time.ctime(int(meta['updated']))
-				if 'created' not in meta:
-					meta['created'] = 'unknown'
-				else:
-					meta['created'] = time.ctime(int(meta['created']))
+					meta = dict()
+					if 'updated' not in project.meta:
+						meta['updated'] = 'never'
+					else:
+						meta['updated'] = time.ctime(int(project.meta['updated']))
+					if 'created' not in project.meta:
+						meta['created'] = 'unknown'
+					else:
+						meta['created'] = time.ctime(int(project.meta['created']))
 
-				tpl_name = os.path.basename(child)
-				log_line(f'| {Fore.CYAN}{tpl_name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |')
-			print()
+					console.indent(f'| {Fore.CYAN}{project.name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |')
+				print()
 		else:
-			log_info('No templates installed yet.')
+			console.info('No templates installed yet.')
 	else:
-		log_warn('Template folder does not exist.')
+		console.warn('Template folder does not exist.')
 		exit(1)
 
 

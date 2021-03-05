@@ -20,23 +20,26 @@ META_FILE = '.parboil'
 
 class Project(object):
 
-	def __init__(self, name):
+	def __init__(self, name, tpldir=None, repo=None):
+		if not tpldir and not repo:
+			raise AttributeError('PARBOIL: key TPLDIR is mandatory in config')
 		self._name = name
+		self._repo = repo
+		if tpldir:
+			self._root_dir = (Path(tpldir) / self._name).resolve()
+		else:
+			self._root_dir = (repo.root / self._name).resolve()
 
 	@property
 	def name(self):
 		return self._name
 
-	def setup(self, config, load_project=False):
-		if not 'TPLDIR' in config:
-			raise AttributeError('PARBOIL: key TPLDIR is mandatory in config')
-		self.root_dir = (Path(config['TPLDIR']) / self._name).resolve()
-
+	def setup(self, load_project=False):
 		# setup config files and paths
-		self.project_file = self.root_dir / PRJ_FILE
-		self.meta_file = self.root_dir / META_FILE
-		self.templates_dir = self.root_dir / 'template'
-		self.includes_dir = self.root_dir / 'includes'
+		self.project_file = self._root_dir / PRJ_FILE
+		self.meta_file = self._root_dir / META_FILE
+		self.templates_dir = self._root_dir / 'template'
+		self.includes_dir = self._root_dir / 'includes'
 
 
 		self.meta = dict()
@@ -62,13 +65,13 @@ class Project(object):
 				self.includes.append(dirname / name)
 
 		if load_project:
-			self.load(config)
+			self.load()
 
-	def load(self, config=dict()):
+	def load(self):
 		"""Loads the project file and some metadata"""
 
 		if not self.project_file:
-			self.setup(config)
+			self.setup()
 
 		## project file
 		if self.project_file.exists():
@@ -147,3 +150,36 @@ class Project(object):
 				yield (True, file_in, path_render)
 			else:
 				yield (False, file_in, '')
+
+
+class Repository(object):
+
+	def __init__(self, root):
+		self._root = Path(root)
+		self.load()
+
+	@property
+	def root(self):
+		return self._root
+
+	def exists(self):
+		return self._root.is_dir()
+
+	def load(self):
+		self._projects = list()
+		for child in self._root.iterdir():
+			if child.is_dir():
+				project_file = child / PRJ_FILE
+				if project_file.is_file():
+					self._projects.append(child.name)
+
+	def __len__(self):
+		return len(self._projects)
+
+	def __iter__(self):
+		yield from self._projects
+
+	def projects(self):
+		for prj in self._projects:
+			yield Project(prj, repo=self)
+

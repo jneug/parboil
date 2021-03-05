@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import unicodedata, re
 from datetime import datetime
 from functools import update_wrapper
 
@@ -53,8 +54,21 @@ class JinjaTimeExtension(Extension):
 		return nodes.Output([call_method], lineno=lineno)
 
 
-def jinja_filter_filename( value ):
-	return f'filename:{value}'
+def jinja_filter_fileify(s):
+    """
+    Django util.text.get_valid_filename
+    """
+    s = str(s).strip().replace(' ', '_')
+    return re.sub(r'(?u)[^-\w.]', '', s)
 
-def jinja_filter_sluggify( value ):
-	return f'sluggify:{value}'
+def jinja_filter_slugify(value, allow_unicode=False):
+    """
+    Django util.text.slugify
+    """
+    value = str(value)
+    if allow_unicode:
+        value = unicodedata.normalize('NFKC', value)
+    else:
+        value = unicodedata.normalize('NFKD', value).encode('ascii', 'ignore').decode('ascii')
+    value = re.sub(r'[^\w\s-]', '', value.lower())
+    return re.sub(r'[-\s]+', '-', value).strip('-_')

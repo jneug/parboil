@@ -20,7 +20,7 @@ from colorama import Fore, Back, Style
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 from .version import __version__
-from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_filename, jinja_filter_sluggify
+from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
 
 
 # set global defaults
@@ -373,8 +373,8 @@ def use(ctx, template, out, hard, value):
 		]),
 		extensions=[JinjaTimeExtension]
 	)
-	jinja.filters['filename'] = jinja_filter_filename
-	jinja.filters['slug'] = jinja_filter_sluggify
+	jinja.filters['fileify'] = jinja_filter_fileify
+	jinja.filters['slugify'] = jinja_filter_slugify
 
 	# TODO: use pathlib
 	for root, dirs, files in os.walk(tpl_root):
@@ -405,10 +405,8 @@ def use(ctx, template, out, hard, value):
 			# Render template
 			tpl_render  = jinja.get_template(path_in).render(**variables)
 
-			if local_cfg['trim_content']:
-				tpl_render = tpl_render.strip()
-
-			if local_cfg['keep_empty_files'] or len(tpl_render) > 0:
+			# TODO: How to mark files as "Keep even if empty"?
+			if len(tpl_render) > 0:
 				if not os.path.exists(out / dirname):
 					os.makedirs(out / dirname)
 

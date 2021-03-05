@@ -1,12 +1,25 @@
 {
+  "fields": {
     "Project": "Test",
     "Name": "My Name",
-    "Foo": [1,2,3,4],
+    "Foo": [
+      1,
+      2,
+      3,
+      4
+    ],
     "HelperFile": {
-    	"type": "file-select",
-    	"value": [
-    		"a.txt", "b.txt", "c.txt"
-    	],
-    	"filename": "LICENSE"
+      "type": "file-select",
+      "value": [
+        "a.txt",
+        "b.txt",
+        "c.txt"
+      ],
+      "filename": "LICENSE"
     }
+  },
+  "files": {
+  	"aaa/rename_me.txt": "{% time '%Y' %}_{{ Project }}.txt",
+  	"rename_me.txt": "{% time '%Y-%d-%m' %}_{{ Foo }}.txt"
+  }
 }

@@ -20,27 +20,16 @@ from colorama import Fore, Back, Style
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 from .version import __version__
-from .ext import JinjaTimeExtension, jinja_filter_filename, jinja_filter_sluggify
+from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_filename, jinja_filter_sluggify
 
 
+# set global defaults
+CFG_FILE  = 'config.json'
+PRJ_FILE  = 'project.json'
+META_FILE = '.parboil'
 
-# Load global config
-BOIL_CONFIG = dict(
-	TPL_DIR = str(Path.home() / '.config' / 'parboil' / 'templates'),
-	META_FILE = '.parboil',
-	trim_content = True,
-	keep_empty_files = False,
-	sort_prompts = False
-)
-
-# Load config
 # TODO: use click.get_app_dir to be plattform independent
-cfg_file = Path.home() /  '.config' / 'parboil' / 'config.json'
-if cfg_file.exists():
-	with open(cfg_file) as f:
-		config_from_file = json.load(f)
-		BOIL_CONFIG = {**BOIL_CONFIG, **config_from_file}
-
+CFG_DIR = Path.home() /  '.config' / 'parboil'
 
 
 # Some helper
@@ -76,28 +65,45 @@ def log_question( msg, default=None, echo=click.prompt, color=Fore.BLUE ):
 # TODO: Options for debug/verbosity and colors
 @click.group()
 @click.version_option(version=__version__, prog_name='parboil')
-@click.option('-c', '--config', type=click.File(),
+@click.option('-c', '--config', type=click.File(), envvar='BOIL_CONFIG',
 		help='Provides a different json config file for this run. Read from stdin with -.')
-def boil(config):
-	if config:
-		USER_CONFIG = json.load(config)
-		USER_CONFIG = {**BOIL_CONFIG, **USER_CONFIG}
-		globals()['BOIL_CONFIG'] = USER_CONFIG
+@click.option('--tpldir', type=click.Path(file_okay=False, dir_okay=True), envvar='BOIL_TPLDIR',
+		help='Location of the local template repository.')
+@click.pass_context
+def boil(ctx, config, tpldir):
+	ctx.ensure_object(dict)
 
+	# Set default values
+	ctx.obj['TPLDIR'] = CFG_DIR / 'templates'
+
+	# Load config file
+	if config:
+		user_cfg = json.load(config)
+		ctx.obj = {**ctx.obj, **user_cfg}
+	else:
+		cfg_file = CFG_DIR / CFG_FILE
+		if cfg_file.exists():
+			with open(cfg_file) as f:
+				cmd_cfg = json.load(f)
+				ctx.obj = {**ctx.obj, **cmd_cfg}
+
+	if tpldir:
+		ctx.obj['TPLDIR'] = tpldir
+	ctx.obj['TPLDIR'] = Path(ctx.obj['TPLDIR'])
 
 
 @boil.command()
-def list():
-	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
-	if TPL_DIR.exists():
-		log_info(f'Listing templates in {Style.BRIGHT}{TPL_DIR}{Style.RESET_ALL}.')
-		folders = [str(p) for p in TPL_DIR.iterdir()]
+@pass_tpldir
+def list(TPLDIR):
+	if TPLDIR.exists():
+		log_info(f'Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}.')
+		folders = [str(p) for p in TPLDIR.iterdir()]
 		if len(folders) > 0:
 			print()
 			log_line(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
 			log_line(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
 			for child in sorted(folders):
-				meta_file = Path(child) / BOIL_CONFIG['META_FILE']
+				meta_file = Path(child) / META_FILE
 
 				meta = dict()
 				if meta_file.is_file():
@@ -128,8 +134,8 @@ def list():
 		help='Set this flag if SOURCE is a github repository to download instead of a local directory.')
 @click.argument('source')
 @click.argument('template', required=False)
-@click.pass_context
-def install(ctx, source, template, force, download):
+@pass_tpldir
+def install(TPLDIR, source, template, force, download):
 	"""
 	Install a project template named TEMPLATE from SOURCE to the local template repository.
 
@@ -139,7 +145,6 @@ def install(ctx, source, template, force, download):
 	"""
 	# TODO: validate templates!
 	# TODO: handle both github urls and local directories
-	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
 
 	if re.match(r'https?://(www\.)?github\.com', source):
 		download = True
@@ -167,7 +172,7 @@ def install(ctx, source, template, force, download):
 			template = source.name
 
 	# Check target dir
-	tpl_dir = TPL_DIR  / template
+	tpl_dir = TPLDIR  / template
 	if tpl_dir.is_dir():
 		rm = force
 		if not force:
@@ -196,7 +201,7 @@ def install(ctx, source, template, force, download):
 			meta['source_type'] = 'local'
 			meta['source'] = str(source.resolve())
 		# Create .parboil for later updates
-		with open(tpl_dir / BOIL_CONFIG['META_FILE'], 'w') as f:
+		with open(tpl_dir / META_FILE, 'w') as f:
 			json.dump(meta, f)
 		log_success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
 		log_line(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
@@ -204,13 +209,12 @@ def install(ctx, source, template, force, download):
 		log_error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
 
 
-
 @boil.command()
 @click.option('-f', '--force', is_flag=True)
 @click.argument('template')
-def uninstall(force, template):
-	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
-	tpl_dir = TPL_DIR  / template
+@pass_tpldir
+def uninstall(TPLDIR, force, template):
+	tpl_dir = TPLDIR  / template
 	if tpl_dir.is_dir():
 		rm = force
 		if not force:
@@ -234,8 +238,9 @@ def update(ctx, template):
 	"""
 	Update TEMPLATE from the source it was first installed from.
 	"""
-	tpl_dir = Path(BOIL_CONFIG['TPL_DIR'])  / template
-	meta_file = tpl_dir / BOIL_CONFIG['META_FILE']
+	cfg = ctx.obj
+	tpl_dir = ctx['TPLDIR']  / template
+	meta_file = tpl_dir / META_FILE
 
 	if not tpl_dir.is_dir():
 		log_error('Template does not exist.', echo=ctx.fail)
@@ -261,45 +266,30 @@ def update(ctx, template):
 
 
 @boil.command()
-#@click.option('-o', '--out', help='The output directory.',
-#		default='.', show_default=True,
-#		type=click.Path(file_okay=False, dir_okay=True, writable=True))
-#@click.option('-f', '--force', is_flag=True,
-#		help='Force overwrite of existing output directory. If the directory given with -o exists and is not empty, it will be deleted and newly created. If -m is present, this flag is ignored.')
 @click.option('--hard', is_flag=True,
 		help='Force overwrite of existing output directory. If the directory OUT exists and is not empty, it will be deleted and newly created.')
-#@click.option('-m', '--merge', is_flag=True,
-#		help='Merge template into existing output directory without prompting. If the direcotry given with -o exists and is not empty, the direcotry is not deleted, but old files will be overwritten with new ones generated from the template.')
+@click.option('-v', '--value', multiple=True, nargs=2,
+	  help='Sets a prefilled value for the template.')
 @click.argument('template')
 @click.argument('out', default='.',
 	type=click.Path(file_okay=False, dir_okay=True, writable=True))
 @click.pass_context
-def use(ctx, template, out, hard):
+def use(ctx, template, out, hard, value):
 	"""
 	Generate a new project from TEMPLATE.
 
 	If OUT is given and a directory, the template is created there.
 	Otherwise the cwd is used.
 	"""
-
-	# copy global config for this run
-	# TODO: Setup before as context?
-	TPL_DIR = Path(BOIL_CONFIG['TPL_DIR'])
-	local_cfg = {**BOIL_CONFIG}
+	cfg = ctx.obj
 
 	# Check teamplate and read configuration
 	project = None
 
-	project_file = TPL_DIR  / template / 'project.json'
+	project_file = cfg['TPLDIR'] / template / PRJ_FILE
 	if project_file.exists():
 		with open(project_file) as f:
 			project = json.load(f)
-			if '__pylr' in project:
-				# Update config with template specific settings
-				if 'tpl_dir' in project['__pylr']:
-					del project['__pylr']['tpl_dir']
-				local_cfg = {**local_cfg, **project['__pylr']}
-				del project['__pylr']
 
 	if project is None:
 		log_warn(f'No valid template found for key {Fore.CYAN}{template}{Style.RESET_ALL}')
@@ -325,12 +315,21 @@ def use(ctx, template, out, hard):
 
 
 	# Prepare store for variables
+	if 'fields' not in project:
+		project['fields'] = dict()
+	if 'files' not in project:
+		project['files'] = dict()
 	variables = dict()
 
 	# Read user input (if necessary)
-	if len(project) > 0:
-		prefilled = BOIL_CONFIG['prefilled'] if 'prefilled' in BOIL_CONFIG else dict()
-		for key, val in project.items():
+	if len(project['fields']) > 0:
+		# Prepare dict for prefilled values
+		prefilled = cfg['prefilled'] if 'prefilled' in cfg else dict()
+		if value:
+			for k, v in value:
+				prefilled[k] = v
+
+		for key, val in project['fields'].items():
 			if key in prefilled:
 				variables[key] = prefilled[key]
 				log_info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
@@ -360,8 +359,8 @@ def use(ctx, template, out, hard):
 
 
 	# Setup Jinja2 and render templates
-	tpl_root = TPL_DIR / template / 'template'
-	inc_root = TPL_DIR / template / 'includes'
+	tpl_root = cfg['TPLDIR'] / template / 'template'
+	inc_root = cfg['TPLDIR'] / template / 'includes'
 
 	jinja = Environment(
 		#loader=FileSystemLoader([tpl_root, inc_root]),
@@ -381,9 +380,14 @@ def use(ctx, template, out, hard):
 	for root, dirs, files in os.walk(tpl_root):
 		root = Path(root).resolve()
 		for name in files:
-			dirname = os.path.relpath(root, start=tpl_root)
-			path = os.path.join(dirname, name)
-			#print(f'[{Fore.GREEN}-{Style.RESET_ALL}] Working on {Style.BRIGHT}{path}{Style.RESET_ALL}')
+			dirname  = os.path.relpath(root, start=tpl_root)
+			dirname  = '' if dirname == '.' else dirname
+			path_in  = os.path.join(dirname, name)
+			path_out = path_in
+			if path_in in project['files']:
+				if type(project['files'][path_in]) is str:
+					path_out = os.path.join(dirname, project['files'][path_in])
+			#log_info(f'Working on {Style.BRIGHT}{path}{Style.RESET_ALL}')
 
 			# Set some dynamic values
 			variables['BOIL'] = dict(
@@ -394,11 +398,12 @@ def use(ctx, template, out, hard):
 			)
 
 			# TODO: Escape vars for safe filenames
-			path_render = jinja.from_string(path).render(**variables)
+			path_render = jinja.from_string(path_out).render(**variables)
 			variables['BOIL']['FILENAME'] = os.path.basename(path_render)
+			variables['BOIL']['FILEPATH'] = path_render
 
 			# Render template
-			tpl_render  = jinja.get_template(path).render(**variables)
+			tpl_render  = jinja.get_template(path_in).render(**variables)
 
 			if local_cfg['trim_content']:
 				tpl_render = tpl_render.strip()

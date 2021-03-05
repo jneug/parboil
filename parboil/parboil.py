@@ -125,6 +125,7 @@ def list(TPLDIR):
 			log_info('No templates installed yet.')
 	else:
 		log_warn('Template folder does not exist.')
+		exit(1)
 
 
 @boil.command()
@@ -134,8 +135,8 @@ def list(TPLDIR):
 		help='Set this flag if SOURCE is a github repository to download instead of a local directory.')
 @click.argument('source')
 @click.argument('template', required=False)
-@pass_tpldir
-def install(TPLDIR, source, template, force, download):
+@click.pass_context
+def install(ctx, source, template, force, download):
 	"""
 	Install a project template named TEMPLATE from SOURCE to the local template repository.
 
@@ -145,6 +146,7 @@ def install(TPLDIR, source, template, force, download):
 	"""
 	# TODO: validate templates!
 	# TODO: handle both github urls and local directories
+	TPLDIR = ctx.obj['TPLDIR']
 
 	if re.match(r'https?://(www\.)?github\.com', source):
 		download = True

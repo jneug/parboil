@@ -23,7 +23,7 @@ import parboil.console as console
 import parboil.fields as fields
 
 from .version import __version__
-from .project import Project, Repository, ProjectError
+from .project import Project, Repository, ProjectError, ProjectFileNotFoundError, ProjectExistsError
 from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
 
 
@@ -32,36 +32,6 @@ CFG_FILE  = 'config.json'
 
 # TODO: use click.get_app_dir to be plattform independent
 CFG_DIR = Path.home() /  '.config' / 'parboil'
-
-
-# Some helper
-def log( msg, echo=click.echo, decor='' ):
-	if callable(echo):
-		return echo(f'{decor}{msg}')
-	else:
-		return f'{decor}{msg}'
-
-def log_info( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.BLUE}{Style.BRIGHT}i{Style.RESET_ALL}] ')
-
-def log_warn( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.YELLOW}{Style.BRIGHT}!{Style.RESET_ALL}] ')
-
-def log_error( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.RED}{Style.BRIGHT}X{Style.RESET_ALL}] ')
-
-def log_success( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor=f'[{Fore.GREEN}{Style.BRIGHT}✓{Style.RESET_ALL}] ')
-
-def log_line( msg, echo=click.echo ):
-	return log(msg, echo=echo, decor='    ')
-
-def log_question( msg, default=None, echo=click.prompt, color=Fore.BLUE ):
-	msg = log(msg, echo=None, decor=f'[{color}{Style.BRIGHT}?{Style.RESET_ALL}] ')
-	if default:
-		return echo(msg, default=default)
-	else:
-		return echo(msg)
 
 
 # TODO: Options for debug/verbosity and colors
@@ -136,10 +106,11 @@ def list(TPLDIR, plain):
 		help='Set this flag to overwrite existing templates named TEMPLATE without prompting.')
 @click.option('-d', '--download', is_flag=True,
 		help='Set this flag if SOURCE is a github repository to download instead of a local directory.')
+@click.option('-r', '--repo','is_repo', is_flag=True)
 @click.argument('source')
 @click.argument('template', required=False)
 @click.pass_context
-def install(ctx, source, template, force, download):
+def install(ctx, source, template, force, download, is_repo):
 	"""
 	Install a project template named TEMPLATE from SOURCE to the local template repository.
 
@@ -164,24 +135,29 @@ def install(ctx, source, template, force, download):
 		if not template:
 			template = Path(source).name
 
-	if not force and repo.is_installed(template):
+	if not is_repo and not force and repo.is_installed(template):
 		if not console.question(f'Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm):
 			ctx.abort()
 
 	try:
 		if download:
-			project = repo.install_from_github(template, source, hard=True)
+			projects = repo.install_from_github(template, source, hard=True, is_repo=is_repo)
 		else:
-			project = repo.install_from_directory(template, source, hard=True)
-	except FileNotFoundError as fnfe:
+			projects = repo.install_from_directory(template, source, hard=True, is_repo=is_repo)
+	except ProjectError as fnfe:
 		console.error(str(fnfe))
 	except FileExistsError as fee:
 		console.error(str(fee))
 	except shutil.Error:
 		console.error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
 	else:
-		console.success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
-		console.indent(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
+		if type(projects) is type([]):
+			for project in projects:
+				console.success(f'Installed template {Style.BRIGHT}{project.name}{Style.RESET_ALL}')
+			console.indent(f'Use with {Fore.MAGENTA}boil use <template_name>{Style.RESET_ALL}')
+		else:
+			console.success(f'Installed template {Style.BRIGHT}{projects.name}{Style.RESET_ALL}')
+			console.indent(f'Use with {Fore.MAGENTA}boil use {projects.name}{Style.RESET_ALL}')
 
 
 
@@ -227,9 +203,12 @@ def update(ctx, template):
 	project.setup(load_project=True)
 	try:
 		project.update()
-	except ProjectError:
-		console.error('Template metafile does not exist. Can\'t read update information.')
+	except ProjectFileNotFoundError as pe:
+		console.error(str(pe))
 		console.indent(f'To update templates make sure to install with {Fore.MAGENTA}boil install{Style.RESET_ALL}.')
+		ctx.abort()
+	except ProjectError as pe:
+		console.error(str(pe))
 		ctx.abort()
 	else:
 		if project.meta['source_type'] == 'github':

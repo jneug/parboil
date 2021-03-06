@@ -263,7 +263,7 @@ def use(ctx, template, out, hard, value):
 	# Read user input (if necessary)
 	if project.fields:
 		# Prepare dict for prefilled values
-		prefilled = project.config['prefilled'] if 'prefilled' in project.config else dict()
+		prefilled = cfg['prefilled'] if 'prefilled' in cfg else dict()
 		if value:
 			for k, v in value:
 				prefilled[k] = v
@@ -276,8 +276,9 @@ def use(ctx, template, out, hard, value):
 			if type(descr) is dict and 'type' in descr:
 				field_callable = f'field_{descr["type"]}'
 				del descr["type"]
+
 				if hasattr(fields, field_callable):
-					project.variables[key] = getattr(fields, field_callable)(key=key, **descr, project=project)
+					project.variables[key] = getattr(fields, field_callable)(key=key, **descr, value=value, project=project)
 
 	for success, file_in, file_out in project.compile(out):
 		if success:

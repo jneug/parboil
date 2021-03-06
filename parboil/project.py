@@ -122,7 +122,11 @@ class Project(object):
 		target_dir = Path(target_dir).resolve()
 
 		result = (list(), list())
-		for file_in in self.templates:
+		for file in self.templates:
+			if type(file) is str:
+				file_in  = Path(file[9:]) if file.startswith('includes:') else Path(file)
+			else:
+				file_in = file
 			file_out = Path(file_in)
 			if str(file_in) in self.config['files']:
 				if type(self.config['files'][str(file_in)]) is str:
@@ -145,7 +149,7 @@ class Project(object):
 			boil_vars['FILEPATH'] = path_render
 
 			# Render template
-			tpl_render = jinja.get_template(str(file_in)).render(**self.variables, BOIL=boil_vars)
+			tpl_render = jinja.get_template(str(file)).render(**self.variables, BOIL=boil_vars)
 
 			path_render_abs = target_dir / path_render
 			if len(tpl_render) > 0:
@@ -155,9 +159,9 @@ class Project(object):
 				with open(path_render_abs, 'w') as f:
 					f.write(tpl_render)
 
-				yield (True, file_in, path_render)
+				yield (True, str(file), path_render)
 			else:
-				yield (False, file_in, '')
+				yield (False, str(file), '')
 
 	def save(self):
 		"""Saves the current meta file to disk"""

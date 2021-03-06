@@ -19,14 +19,16 @@ import click
 from colorama import Fore, Back, Style
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
+import parboil.console as console
+import parboil.fields as fields
+
 from .version import __version__
+from .project import Project, Repository, ProjectError
 from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
 
 
 # set global defaults
 CFG_FILE  = 'config.json'
-PRJ_FILE  = 'project.json'
-META_FILE = '.parboil'
 
 # TODO: use click.get_app_dir to be plattform independent
 CFG_DIR = Path.home() /  '.config' / 'parboil'
@@ -93,38 +95,40 @@ def boil(ctx, config, tpldir):
 
 
 @boil.command()
+@click.option('-p', '--plain', is_flag=True)
 @pass_tpldir
-def list(TPLDIR):
-	if TPLDIR.exists():
-		log_info(f'Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}.')
-		folders = [str(p) for p in TPLDIR.iterdir()]
-		if len(folders) > 0:
-			print()
-			log_line(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
-			log_line(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
-			for child in sorted(folders):
-				meta_file = Path(child) / META_FILE
+def list(TPLDIR, plain):
+	repo = Repository(TPLDIR)
+	if repo.exists():
+		if len(repo) > 0:
+			if plain:
+				for project in repo:
+					click.echo(project)
+			else:
+				console.info(f'Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}.')
+				print()
+				console.indent(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
+				console.indent(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
+				for project in repo.projects():
+					project.setup(load_project=True)
 
-				meta = dict()
-				if meta_file.is_file():
-					with open(meta_file) as f:
-						meta = json.load(f)
-				if 'updated' not in meta:
-					meta['updated'] = 'never'
-				else:
-					meta['updated'] = time.ctime(int(meta['updated']))
-				if 'created' not in meta:
-					meta['created'] = 'unknown'
-				else:
-					meta['created'] = time.ctime(int(meta['created']))
+					meta = dict()
+					if 'updated' not in project.meta:
+						meta['updated'] = 'never'
+					else:
+						meta['updated'] = time.ctime(int(project.meta['updated']))
+					if 'created' not in project.meta:
+						meta['created'] = 'unknown'
+					else:
+						meta['created'] = time.ctime(int(project.meta['created']))
 
-				tpl_name = os.path.basename(child)
-				log_line(f'| {Fore.CYAN}{tpl_name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |')
-			print()
+					console.indent(f'| {Fore.CYAN}{project.name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |')
+				print()
 		else:
-			log_info('No templates installed yet.')
+			console.info('No templates installed yet.')
 	else:
-		log_warn('Template folder does not exist.')
+		console.warn('Template folder does not exist.')
+		exit(1)
 
 
 @boil.command()
@@ -134,8 +138,8 @@ def list(TPLDIR):
 		help='Set this flag if SOURCE is a github repository to download instead of a local directory.')
 @click.argument('source')
 @click.argument('template', required=False)
-@pass_tpldir
-def install(TPLDIR, source, template, force, download):
+@click.pass_context
+def install(ctx, source, template, force, download):
 	"""
 	Install a project template named TEMPLATE from SOURCE to the local template repository.
 
@@ -144,69 +148,41 @@ def install(TPLDIR, source, template, force, download):
 	it isn't a local directory.
 	"""
 	# TODO: validate templates!
-	# TODO: handle both github urls and local directories
+	TPLDIR = ctx.obj['TPLDIR']
+	repo = Repository(TPLDIR)
 
+	# is github url? Than assume -d
 	if re.match(r'https?://(www\.)?github\.com', source):
 		download = True
+	# set missing arguments
 	if download:
-		# TODO: validate github urls
 		if re.match('[A-Za-z_-]+/[A-Za-z_-]+', source):
 			source = f'https://github.com/{source}'
 		if not template:
 			template = source.split('/')[-1]
 	else:
-		source = Path(source).resolve()
-		project_file = source / 'project.json'
-		template_dir = source / 'template'
-
-		if not source.is_dir():
-			log_error('Source does not exist', echo=ctx.fail)
-
-		if not project_file.is_file():
-			log_error('The source directory does not contain a project.json file', echo=ctx.fail)
-
-		if not template_dir.is_dir():
-			log_error('The source directory does not contain a template directory', echo=ctx.fail)
-
 		if not template:
-			template = source.name
+			template = Path(source).name
 
-	# Check target dir
-	tpl_dir = TPLDIR  / template
-	if tpl_dir.is_dir():
-		rm = force
-		if not force:
-			rm = log_question(f'Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
-		if rm:
-			try:
-				shutil.rmtree(str(tpl_dir))
-				log_success(f'Removed template {Fore.CYAN}{template}{Style.RESET_ALL}')
-			except shutil.Error:
-				log_error(f'Error while removing template {Fore.CYAN}{template}{Style.RESET_ALL}')
-				log_line('You might need to manually delete the template directory at')
-				log_line(f'{Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
-				ctx.exit(1)
-		else:
-			ctx.exit(1)
+	if not force and repo.is_installed(template):
+		if not console.question(f'Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm):
+			ctx.abort()
 
 	try:
-		meta = {'created': time.time(), 'source': str(source)}
 		if download:
-			# TODO: Does this work on windows?
-			git = subprocess.Popen(['git', 'clone', str(source), str(tpl_dir)])
-			git.wait(30)
-			meta['source_type'] = 'github'
+			project = repo.install_from_github(template, source, hard=True)
 		else:
-			shutil.copytree(source, tpl_dir)
-			meta['source_type'] = 'local'
-			meta['source'] = str(source.resolve())
-		# Create .parboil for later updates
-		with open(tpl_dir / META_FILE, 'w') as f:
-			json.dump(meta, f)
-		log_success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
-		log_line(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
+			project = repo.install_from_directory(template, source, hard=True)
+	except FileNotFoundError as fnfe:
+		console.error(str(fnfe))
+	except FileExistsError as fee:
+		console.error(str(fee))
 	except shutil.Error:
-		log_error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
+		console.error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
+	else:
+		console.success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
+		console.indent(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
+
 
 
 @boil.command()
@@ -214,21 +190,22 @@ def install(TPLDIR, source, template, force, download):
 @click.argument('template')
 @pass_tpldir
 def uninstall(TPLDIR, force, template):
-	tpl_dir = TPLDIR  / template
-	if tpl_dir.is_dir():
+	repo = Repository(TPLDIR)
+
+	if repo.is_installed(template):
 		rm = force
 		if not force:
-			rm = log_question(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
+			rm = console.question(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
 		if rm:
 			try:
-				shutil.rmtree(str(tpl_dir))
-				log_success(f'Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
+				repo.uninstall(template)
+				console.success(f'Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
 			except:
-				log_error(f'Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}')
-				log_line(f'You might need to manually delete the template directory at')
-				log_line(f'{Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
+				console.error(f'Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}')
+				console.line(f'You might need to manually delete the template directory at')
+				console.line(f'{Style.BRIGHT}{repo.root}{Style.RESET_ALL}')
 	else:
-		log_warn(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
+		console.warn(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
 
 
 @boil.command()
@@ -239,30 +216,26 @@ def update(ctx, template):
 	Update TEMPLATE from the source it was first installed from.
 	"""
 	cfg = ctx.obj
-	tpl_dir = ctx['TPLDIR']  / template
-	meta_file = tpl_dir / META_FILE
 
-	if not tpl_dir.is_dir():
-		log_error('Template does not exist.', echo=ctx.fail)
+	repo = Repository(cfg['TPLDIR'])
 
-	if not meta_file.is_file():
-		log_error('Template metafile does not exist. Can\'t read update information.', echo=ctx.fail)
+	if not repo.is_installed(template):
+		console.error(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist.')
+		ctx.exit(2)
 
-	with open(meta_file) as f:
-		meta = json.load(f)
-
-	if meta['source_type'] == 'github':
-		git = subprocess.Popen(['git', 'pull', '--rebase'], cwd=tpl_dir)
-		git.wait(30)
-		log_success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from GitHub.')
+	project = repo.get_project(template)
+	project.setup(load_project=True)
+	try:
+		project.update()
+	except ProjectError:
+		console.error('Template metafile does not exist. Can\'t read update information.')
+		console.indent(f'To update templates make sure to install with {Fore.MAGENTA}boil install{Style.RESET_ALL}.')
+		ctx.abort()
 	else:
-		shutil.rmtree(tpl_dir)
-		shutil.copytree(meta['source'], tpl_dir)
-		log_success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from local filesystem.')
-	meta['updated'] = time.time()
-	# Create .parboil for later updates
-	with open(tpl_dir / '.parboil', 'w') as f:
-		json.dump(meta, f)
+		if project.meta['source_type'] == 'github':
+			console.success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from GitHub.')
+		else:
+			console.success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from local filesystem.')
 
 
 @boil.command()
@@ -284,17 +257,12 @@ def use(ctx, template, out, hard, value):
 	cfg = ctx.obj
 
 	# Check teamplate and read configuration
-	project = None
-
-	project_file = cfg['TPLDIR'] / template / PRJ_FILE
-	if project_file.exists():
-		with open(project_file) as f:
-			project = json.load(f)
-
-	if project is None:
-		log_warn(f'No valid template found for key {Fore.CYAN}{template}{Style.RESET_ALL}')
+	project = Project(template, cfg['TPLDIR'])
+	try:
+		project.setup(load_project=True)
+	except FileNotFoundError:
+		console.warn(f'No valid template found for key {Fore.CYAN}{template}{Style.RESET_ALL}')
 		ctx.exit(1)
-		return
 
 	# Prepare output directory
 	if out == '.':
@@ -308,112 +276,34 @@ def use(ctx, template, out, hard, value):
 		if hard:
 			shutil.rmtree(out)
 			out.mkdir(parents=True)
-			log_success(f'Cleared {Style.BRIGHT}{out}{Style.RESET_ALL}')
+			console.success(f'Cleared {Style.BRIGHT}{out}{Style.RESET_ALL}')
 	elif not out.exists():
 		out.mkdir(parents=True)
-		log_success(f'Created {Style.BRIGHT}{out}{Style.RESET_ALL}')
-
-
-	# Prepare store for variables
-	if 'fields' not in project:
-		project['fields'] = dict()
-	if 'files' not in project:
-		project['files'] = dict()
-	variables = dict()
+		console.success(f'Created {Style.BRIGHT}{out}{Style.RESET_ALL}')
 
 	# Read user input (if necessary)
-	if len(project['fields']) > 0:
+	if project.fields:
 		# Prepare dict for prefilled values
-		prefilled = cfg['prefilled'] if 'prefilled' in cfg else dict()
+		prefilled = project.config['prefilled'] if 'prefilled' in project.config else dict()
 		if value:
 			for k, v in value:
 				prefilled[k] = v
 
-		for key, val in project['fields'].items():
+		for key, descr in project.fields.items():
+			value = None
 			if key in prefilled:
-				variables[key] = prefilled[key]
-				log_info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-			else:
-				if type(val) == dict:
-					pass
-				elif type(val) == type([]): # TODO: Seems wrong as a test for lists?
-					if len(val) > 1:
-						log_question(f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', echo=click.echo)
-						for n,choice in enumerate(val):
-							log_line(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} -  "{choice}"')
-						n = click.prompt(log_line(f'Select from 1..{len(val)}', echo=None), default=1)
-						if n > len(val):
-							log_warn(f'{n} is not a valid choice. Using default.')
-							n = 1
-					else:
-						n = 1
-					variables[key] = val[n-1]
-					variables[f'{key}_index'] = n-1
-				elif type(val) is bool:
-					if val:
-						variables[key] = not log_question(f'Do you want do disable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-					else:
-						variables[key] = log_question(f'Do you want do enable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-				else:
-					variables[key] = log_question(f'Enter a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"', default=val)
+				value = prefilled[key]
 
+			if type(descr) is dict and 'type' in descr:
+				field_callable = f'field_{descr["type"]}'
+				del descr["type"]
+				if hasattr(fields, field_callable):
+					project.variables[key] = getattr(fields, field_callable)(key=key, **descr, project=project)
 
-	# Setup Jinja2 and render templates
-	tpl_root = cfg['TPLDIR'] / template / 'template'
-	inc_root = cfg['TPLDIR'] / template / 'includes'
+	for success, file_in, file_out in project.compile(out):
+		if success:
+			console.success(f'Created {Style.BRIGHT}{file_out}{Style.RESET_ALL}')
+		else:
+			console.warn(f'Skipped {Style.BRIGHT}{file_out}{Style.RESET_ALL} due to empty content')
 
-	jinja = Environment(
-		#loader=FileSystemLoader([tpl_root, inc_root]),
-		loader=ChoiceLoader([
-			FileSystemLoader(tpl_root),
-			PrefixLoader(
-				{'includes': FileSystemLoader(inc_root)},
-				delimiter=':'
-			)
-		]),
-		extensions=[JinjaTimeExtension]
-	)
-	jinja.filters['fileify'] = jinja_filter_fileify
-	jinja.filters['slugify'] = jinja_filter_slugify
-
-	# TODO: use pathlib
-	for root, dirs, files in os.walk(tpl_root):
-		root = Path(root).resolve()
-		for name in files:
-			dirname  = os.path.relpath(root, start=tpl_root)
-			dirname  = '' if dirname == '.' else dirname
-			path_in  = os.path.join(dirname, name)
-			path_out = path_in
-			if path_in in project['files']:
-				if type(project['files'][path_in]) is str:
-					path_out = os.path.join(dirname, project['files'][path_in])
-			#log_info(f'Working on {Style.BRIGHT}{path}{Style.RESET_ALL}')
-
-			# Set some dynamic values
-			variables['BOIL'] = dict(
-				TPLNAME = template,
-				RELDIR  = dirname if dirname != '.' else '',
-				ABSDIR  = str((out / dirname).resolve()),
-				OUTDIR  = str(out.resolve())
-			)
-
-			# TODO: Escape vars for safe filenames
-			path_render = jinja.from_string(path_out).render(**variables)
-			variables['BOIL']['FILENAME'] = os.path.basename(path_render)
-			variables['BOIL']['FILEPATH'] = path_render
-
-			# Render template
-			tpl_render  = jinja.get_template(path_in).render(**variables)
-
-			# TODO: How to mark files as "Keep even if empty"?
-			if len(tpl_render) > 0:
-				if not os.path.exists(out / dirname):
-					os.makedirs(out / dirname)
-
-				with open(out / path_render, 'w') as f:
-					f.write(tpl_render)
-				log_success(f'Created {Style.BRIGHT}{path_render}{Style.RESET_ALL}')
-			else:
-				log_warn(f'Skipped {Style.BRIGHT}{path_render}{Style.RESET_ALL} due to empty content')
-
-	log_success(f'Generated project template "{Fore.CYAN}{template}{Style.RESET_ALL}" in {Style.BRIGHT}{out}{Style.RESET_ALL}')
+	console.success(f'Generated project template "{Fore.CYAN}{template}{Style.RESET_ALL}" in {Style.BRIGHT}{out}{Style.RESET_ALL}')

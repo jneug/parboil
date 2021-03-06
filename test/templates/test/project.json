@@ -19,7 +19,7 @@
     }
   },
   "files": {
-  	"aaa/rename_me.txt": "{% time '%Y' %}_{{ Project|fileify }}.txt",
+  	"aaa/rename_me.txt": "aaa/{% time '%Y' %}_{{ Project|fileify }}.txt",
   	"rename_me.txt": "{% time '%Y-%d-%m' %}_{{ Foo }}.txt"
   }
 }

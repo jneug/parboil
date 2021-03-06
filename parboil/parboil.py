@@ -23,7 +23,7 @@ import parboil.console as console
 import parboil.fields as fields
 
 from .version import __version__
-from .project import Project, Repository
+from .project import Project, Repository, ProjectError
 from .ext import pass_tpldir, JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
 
 
@@ -216,30 +216,26 @@ def update(ctx, template):
 	Update TEMPLATE from the source it was first installed from.
 	"""
 	cfg = ctx.obj
-	tpl_dir = ctx['TPLDIR']  / template
-	meta_file = tpl_dir / META_FILE
 
-	if not tpl_dir.is_dir():
-		log_error('Template does not exist.', echo=ctx.fail)
+	repo = Repository(cfg['TPLDIR'])
 
-	if not meta_file.is_file():
-		log_error('Template metafile does not exist. Can\'t read update information.', echo=ctx.fail)
+	if not repo.is_installed(template):
+		console.error(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist.')
+		ctx.exit(2)
 
-	with open(meta_file) as f:
-		meta = json.load(f)
-
-	if meta['source_type'] == 'github':
-		git = subprocess.Popen(['git', 'pull', '--rebase'], cwd=tpl_dir)
-		git.wait(30)
-		log_success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from GitHub.')
+	project = repo.get_project(template)
+	project.setup(load_project=True)
+	try:
+		project.update()
+	except ProjectError:
+		console.error('Template metafile does not exist. Can\'t read update information.')
+		console.indent(f'To update templates make sure to install with {Fore.MAGENTA}boil install{Style.RESET_ALL}.')
+		ctx.abort()
 	else:
-		shutil.rmtree(tpl_dir)
-		shutil.copytree(meta['source'], tpl_dir)
-		log_success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from local filesystem.')
-	meta['updated'] = time.time()
-	# Create .parboil for later updates
-	with open(tpl_dir / '.parboil', 'w') as f:
-		json.dump(meta, f)
+		if project.meta['source_type'] == 'github':
+			console.success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from GitHub.')
+		else:
+			console.success(f'Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from local filesystem.')
 
 
 @boil.command()

@@ -38,7 +38,7 @@ class Project(object):
 		return self._root_dir
 
 	def exists(self):
-		self._root_dir.is_dir() and (self._root_dir / PRJ_FILE).is_file()
+		return self._root_dir.is_dir() #and (self._root_dir / PRJ_FILE).is_file()
 
 	def setup(self, load_project=False):
 		# setup config files and paths
@@ -164,8 +164,25 @@ class Project(object):
 				json.dump(self.meta, f)
 
 	def update(self, hard=False):
-		"""Update the template from the original source"""
-		pass
+		"""Update the template from its original source"""
+		if not self.meta_file.exists():
+			raise ProjectError('Template metadata file does not exist.')
+
+		if self.meta['source_type'] == 'github':
+			git = subprocess.Popen(['git', 'pull', '--rebase'], cwd=self._root_dir)
+			git.wait(30)
+		else:
+			if Path(self.meta['source']).is_dir():
+				shutil.rmtree(self._root_dir)
+				shutil.copytree(self.meta['source'], self._root_dir)
+			else:
+				raise
+
+		# Update meta file for later updates
+		self.meta['updated'] = time.time()
+		self.save()
+
+		self.setup(load_project=True)
 
 
 class Repository(object):
@@ -202,7 +219,10 @@ class Repository(object):
 
 	def projects(self):
 		for prj in self._projects:
-			yield Project(prj, self)
+			yield self.get_project(prj)
+
+	def get_project(self, template):
+		return Project(template, self)
 
 	def install_from_directory(self, template, source, hard=False):
 		"""IF source contains a valid project template it is installed
@@ -229,7 +249,7 @@ class Repository(object):
 			else:
 				self.delete(template)
 
-		project = Project(template, self)
+		project = self.get_project(template)
 
 		# copy files
 		shutil.copytree(source, project.root)
@@ -249,7 +269,7 @@ class Repository(object):
 			else:
 				self.delete(template)
 
-		project = Project(template, self)
+		project = self.get_project(template)
 
 		# do git clone
 		# TODO: Does this work on windows?
@@ -274,3 +294,7 @@ class Repository(object):
 				tpl_dir.unlink()
 			else:
 				shutil.rmtree(tpl_dir)
+
+class ProjectError(Exception):
+	def __init__(self, *args, **kwargs):
+		super(ProjectError, self).__init__(*args, **kwargs)

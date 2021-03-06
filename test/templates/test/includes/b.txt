@@ -1,1 +1,1 @@
-{{BOIL.FILENAME}}
+b.txt: {{BOIL.FILENAME}}

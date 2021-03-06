@@ -9,12 +9,13 @@
       4
     ],
     "HelperFile": {
-      "type": "file-select",
-      "value": [
+      "type": "file_select",
+      "choices": [
         "a.txt",
         "b.txt",
         "c.txt"
       ],
+      "default": 1,
       "filename": "LICENSE"
     }
   },

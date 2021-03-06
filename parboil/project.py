@@ -20,19 +20,25 @@ META_FILE = '.parboil'
 
 class Project(object):
 
-	def __init__(self, name, tpldir=None, repo=None):
-		if not tpldir and not repo:
-			raise AttributeError('PARBOIL: key TPLDIR is mandatory in config')
+	def __init__(self, name, repository):
 		self._name = name
-		self._repo = repo
-		if tpldir:
-			self._root_dir = (Path(tpldir) / self._name).resolve()
+		if type(repository) is Repository:
+			self._repo = repository
+			self._root_dir = (repository.root / self._name).resolve()
 		else:
-			self._root_dir = (repo.root / self._name).resolve()
+			self._repo = None
+			self._root_dir = (Path(repository) / self._name).resolve()
 
 	@property
 	def name(self):
 		return self._name
+
+	@property
+	def root(self):
+		return self._root_dir
+
+	def exists(self):
+		self._root_dir.is_dir() and (self._root_dir / PRJ_FILE).is_file()
 
 	def setup(self, load_project=False):
 		# setup config files and paths
@@ -151,6 +157,16 @@ class Project(object):
 			else:
 				yield (False, file_in, '')
 
+	def save(self):
+		"""Saves the current meta file to disk"""
+		if self.meta_file:
+			with open(self.meta_file, 'w') as f:
+				json.dump(self.meta, f)
+
+	def update(self, hard=False):
+		"""Update the template from the original source"""
+		pass
+
 
 class Repository(object):
 
@@ -179,7 +195,82 @@ class Repository(object):
 	def __iter__(self):
 		yield from self._projects
 
+	def is_installed(self, template):
+		tpl_dir = self._root / template
+		return tpl_dir.is_dir()
+		#return Project(template, self).exists()
+
 	def projects(self):
 		for prj in self._projects:
-			yield Project(prj, repo=self)
+			yield Project(prj, self)
 
+	def install_from_directory(self, template, source, hard=False):
+		"""IF source contains a valid project template it is installed
+		into this local repository and the Project object is returned.
+		"""
+		# check source directory
+		source = Path(source).resolve()
+
+		project_file = source / PRJ_FILE
+		template_dir = source / 'template'
+
+		if not source.is_dir():
+			raise FileNotFoundError('Source does not exist')
+
+		if not project_file.is_file():
+			raise FileNotFoundError(f'The source does not contain a {PRJ_FILE} file')
+
+		if not template_dir.is_dir():
+			raise FileNotFoundError('The source does not contain a template directory')
+
+		if self.is_installed(template):
+			if not hard:
+				raise FileExistsError('The template already exists. Delete first or retry install with hard=True')
+			else:
+				self.delete(template)
+
+		project = Project(template, self)
+
+		# copy files
+		shutil.copytree(source, project.root)
+
+		# create meta file
+		project.setup()
+		project.meta = {'created': time.time(), 'source_type':'local', 'source': str(source)}
+		project.save()
+
+		return project
+
+	def install_from_github(self, template, url, hard=False):
+		# check target dir
+		if self.is_installed(template):
+			if not hard:
+				raise FileExistsError('The template already exists. Delete first or retry install with hard=True')
+			else:
+				self.delete(template)
+
+		project = Project(template, self)
+
+		# do git clone
+		# TODO: Does this work on windows?
+		git = subprocess.Popen(['git', 'clone', url, str(project.root)])
+		git.wait(30)
+
+		# create meta file
+		project.setup()
+		project.meta = {'created': time.time(), 'source_type':'github', 'source': url}
+		project.save()
+
+		return project
+
+	def uninstall(self, template):
+		self.delete(template)
+
+	def delete(self, template):
+		"""Delete a project template from this repository."""
+		tpl_dir = self._root / template
+		if tpl_dir.is_dir():
+			if tpl_dir.is_symlink():
+				tpl_dir.unlink()
+			else:
+				shutil.rmtree(tpl_dir)

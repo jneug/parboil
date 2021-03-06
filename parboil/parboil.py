@@ -148,70 +148,41 @@ def install(ctx, source, template, force, download):
 	it isn't a local directory.
 	"""
 	# TODO: validate templates!
-	# TODO: handle both github urls and local directories
 	TPLDIR = ctx.obj['TPLDIR']
+	repo = Repository(TPLDIR)
 
+	# is github url? Than assume -d
 	if re.match(r'https?://(www\.)?github\.com', source):
 		download = True
+	# set missing arguments
 	if download:
-		# TODO: validate github urls
 		if re.match('[A-Za-z_-]+/[A-Za-z_-]+', source):
 			source = f'https://github.com/{source}'
 		if not template:
 			template = source.split('/')[-1]
 	else:
-		source = Path(source).resolve()
-		project_file = source / 'project.json'
-		template_dir = source / 'template'
-
-		if not source.is_dir():
-			log_error('Source does not exist', echo=ctx.fail)
-
-		if not project_file.is_file():
-			log_error('The source directory does not contain a project.json file', echo=ctx.fail)
-
-		if not template_dir.is_dir():
-			log_error('The source directory does not contain a template directory', echo=ctx.fail)
-
 		if not template:
-			template = source.name
+			template = Path(source).name
 
-	# Check target dir
-	tpl_dir = TPLDIR  / template
-	if tpl_dir.is_dir():
-		rm = force
-		if not force:
-			rm = log_question(f'Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
-		if rm:
-			try:
-				shutil.rmtree(str(tpl_dir))
-				log_success(f'Removed template {Fore.CYAN}{template}{Style.RESET_ALL}')
-			except shutil.Error:
-				log_error(f'Error while removing template {Fore.CYAN}{template}{Style.RESET_ALL}')
-				log_line('You might need to manually delete the template directory at')
-				log_line(f'{Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
-				ctx.exit(1)
-		else:
-			ctx.exit(1)
+	if not force and repo.is_installed(template):
+		if not console.question(f'Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm):
+			ctx.abort()
 
 	try:
-		meta = {'created': time.time(), 'source': str(source)}
 		if download:
-			# TODO: Does this work on windows?
-			git = subprocess.Popen(['git', 'clone', str(source), str(tpl_dir)])
-			git.wait(30)
-			meta['source_type'] = 'github'
+			project = repo.install_from_github(template, source, hard=True)
 		else:
-			shutil.copytree(source, tpl_dir)
-			meta['source_type'] = 'local'
-			meta['source'] = str(source.resolve())
-		# Create .parboil for later updates
-		with open(tpl_dir / META_FILE, 'w') as f:
-			json.dump(meta, f)
-		log_success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
-		log_line(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
+			project = repo.install_from_directory(template, source, hard=True)
+	except FileNotFoundError as fnfe:
+		console.error(str(fnfe))
+	except FileExistsError as fee:
+		console.error(str(fee))
 	except shutil.Error:
-		log_error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
+		console.error(f'Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}', echo=ctx.fail)
+	else:
+		console.success(f'Installed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
+		console.indent(f'Use with {Fore.MAGENTA}boil use {template}{Style.RESET_ALL}')
+
 
 
 @boil.command()
@@ -219,21 +190,22 @@ def install(ctx, source, template, force, download):
 @click.argument('template')
 @pass_tpldir
 def uninstall(TPLDIR, force, template):
-	tpl_dir = TPLDIR  / template
-	if tpl_dir.is_dir():
+	repo = Repository(TPLDIR)
+
+	if repo.is_installed(template):
 		rm = force
 		if not force:
-			rm = log_question(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
+			rm = console.question(f'Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}', color=Fore.YELLOW, echo=click.confirm)
 		if rm:
 			try:
-				shutil.rmtree(str(tpl_dir))
-				log_success(f'Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
+				repo.uninstall(template)
+				console.success(f'Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}')
 			except:
-				log_error(f'Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}')
-				log_line(f'You might need to manually delete the template directory at')
-				log_line(f'{Style.BRIGHT}{tpl_dir}{Style.RESET_ALL}')
+				console.error(f'Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}')
+				console.line(f'You might need to manually delete the template directory at')
+				console.line(f'{Style.BRIGHT}{repo.root}{Style.RESET_ALL}')
 	else:
-		log_warn(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
+		console.warn(f'Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist')
 
 
 @boil.command()
@@ -289,9 +261,9 @@ def use(ctx, template, out, hard, value):
 	cfg = ctx.obj
 
 	# Check teamplate and read configuration
-	project = Project(template)
+	project = Project(template, cfg['TPLDIR'])
 	try:
-		project.setup(cfg, load_project=True)
+		project.setup(load_project=True)
 	except FileNotFoundError:
 		console.warn(f'No valid template found for key {Fore.CYAN}{template}{Style.RESET_ALL}')
 		ctx.exit(1)

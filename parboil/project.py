@@ -6,6 +6,7 @@ import subprocess
 import json
 import shutil
 import time
+import tempfile
 from pathlib import Path
 
 import click
@@ -38,7 +39,10 @@ class Project(object):
 		return self._root_dir
 
 	def exists(self):
-		return self._root_dir.is_dir() #and (self._root_dir / PRJ_FILE).is_file()
+		return self._root_dir.is_dir()
+
+	def is_project(self):
+		return self.exists() and (self._root_dir / PRJ_FILE).is_file()
 
 	def setup(self, load_project=False):
 		# setup config files and paths
@@ -84,9 +88,7 @@ class Project(object):
 			with open(self.project_file) as f:
 				self.config = json.load(f)
 		else:
-			raise FileNotFoundError(
-					f'PARBOIL: Project file for template {self._name} not found.'
-					 '\n         Requested file: {str(self.project_file)}')
+			raise ProjectFileNotFoundError('Project file not found.')
 
 		if 'fields' in self.config:
 			for k,v in self.config['fields'].items():
@@ -166,17 +168,19 @@ class Project(object):
 	def update(self, hard=False):
 		"""Update the template from its original source"""
 		if not self.meta_file.exists():
-			raise ProjectError('Template metadata file does not exist.')
+			raise ProjectFileNotFoundError('Template metafile does not exist. Can\'t read update information.')
 
 		if self.meta['source_type'] == 'github':
 			git = subprocess.Popen(['git', 'pull', '--rebase'], cwd=self._root_dir)
 			git.wait(30)
-		else:
+		elif self.meta['source_type'] == 'local':
 			if Path(self.meta['source']).is_dir():
 				shutil.rmtree(self._root_dir)
 				shutil.copytree(self.meta['source'], self._root_dir)
 			else:
-				raise
+				raise ProjectError('Original source directory no longer exists.')
+		else:
+			raise ProjectError('No source information found.')
 
 		# Update meta file for later updates
 		self.meta['updated'] = time.time()
@@ -224,69 +228,112 @@ class Repository(object):
 	def get_project(self, template):
 		return Project(template, self)
 
-	def install_from_directory(self, template, source, hard=False):
+	def install_from_directory(self, template, source, hard=False, is_repo=False):
 		"""IF source contains a valid project template it is installed
 		into this local repository and the Project object is returned.
 		"""
+		if self.is_installed(template):
+			if not hard:
+				raise ProjectExistsError('The template already exists. Delete first or retry install with hard=True.')
+			else:
+				self._delete(template)
+
 		# check source directory
 		source = Path(source).resolve()
-
-		project_file = source / PRJ_FILE
-		template_dir = source / 'template'
-
 		if not source.is_dir():
-			raise FileNotFoundError('Source does not exist')
+			raise ProjectFileNotFoundError('Source does not exist.')
 
-		if not project_file.is_file():
-			raise FileNotFoundError(f'The source does not contain a {PRJ_FILE} file')
+		if not is_repo:
+			project_file = source / PRJ_FILE
+			template_dir = source / 'template'
 
-		if not template_dir.is_dir():
-			raise FileNotFoundError('The source does not contain a template directory')
+			if not project_file.is_file():
+				raise ProjectFileNotFoundError(f'The source does not contain a {PRJ_FILE} file.')
 
-		if self.is_installed(template):
-			if not hard:
-				raise FileExistsError('The template already exists. Delete first or retry install with hard=True')
-			else:
-				self.delete(template)
+			if not template_dir.is_dir():
+				raise ProjectFileNotFoundError('The source does not contain a template directory.')
 
-		project = self.get_project(template)
+			project = self.get_project(template)
 
-		# copy files
-		shutil.copytree(source, project.root)
+			# copy files
+			shutil.copytree(source, project.root)
 
-		# create meta file
-		project.setup()
-		project.meta = {'created': time.time(), 'source_type':'local', 'source': str(source)}
-		project.save()
+			# create meta file
+			project.setup()
+			project.meta = {'created': time.time(), 'source_type':'local', 'source': str(source)}
+			project.save()
 
-		return project
+			self.load()
+			return project
+		else:
+			projects = list()
 
-	def install_from_github(self, template, url, hard=False):
-		# check target dir
-		if self.is_installed(template):
-			if not hard:
-				raise FileExistsError('The template already exists. Delete first or retry install with hard=True')
-			else:
-				self.delete(template)
+			for child in source.iterdir():
+				if child.is_dir():
+					project_file = child / PRJ_FILE
+					if project_file.is_file():
+						try:
+							project = self.install_from_directory(child.name, child, hard=hard)
+							projects.append(project)
+						except:
+							pass
 
-		project = self.get_project(template)
+			self.load()
+			return projects
 
-		# do git clone
-		# TODO: Does this work on windows?
-		git = subprocess.Popen(['git', 'clone', url, str(project.root)])
-		git.wait(30)
+	def install_from_github(self, template, url, hard=False, is_repo=False):
+		if not is_repo:
+			# check target dir
+			if self.is_installed(template):
+				if not hard:
+					raise ProjectExistsError('The template already exists. Delete first or retry install with hard=True.')
+				else:
+					self._delete(template)
 
-		# create meta file
-		project.setup()
-		project.meta = {'created': time.time(), 'source_type':'github', 'source': url}
-		project.save()
+			project = self.get_project(template)
 
-		return project
+			# do git clone
+			# TODO: Does this work on windows?
+			git = subprocess.Popen(['git', 'clone', url, str(project.root)])
+			git.wait(30)
+
+			# create meta file
+			project.setup()
+			project.meta = {'created': time.time(), 'source_type':'github', 'source': url}
+			project.save()
+
+			self.load()
+			return project
+		else:
+			projects = list() # return list of installed projects
+
+			# do git clone into temp folder
+			with tempfile.TemporaryDirectory() as temp_repo:
+				git = subprocess.Popen(['git', 'clone', url, temp_repo])
+				git.wait(30)
+
+				for child in Path(temp_repo).iterdir():
+					if child.is_dir():
+						project_file = child / PRJ_FILE
+						if project_file.is_file():
+							try:
+								project = self.install_from_directory(child.name, child, hard=hard)
+								# remove source data
+								del project.meta['source_type']
+								del project.meta['source']
+								project.save()
+
+								projects.append(project)
+							except:
+								pass
+
+			self.load()
+			return projects
 
 	def uninstall(self, template):
-		self.delete(template)
+		self._delete(template)
 
-	def delete(self, template):
+	def _delete(self, template):
 		"""Delete a project template from this repository."""
 		tpl_dir = self._root / template
 		if tpl_dir.is_dir():
@@ -295,6 +342,23 @@ class Repository(object):
 			else:
 				shutil.rmtree(tpl_dir)
 
+	def _reload(self):
+		diff = list()
+		for child in self._root.iterdir():
+			if child.is_dir():
+				project_file = child / PRJ_FILE
+				if project_file.is_file():
+					if not child.name in self._projects:
+						diff.append(child.name)
+						self._projects.append(child.name)
+		self._projects.sort()
+		return diff
+
 class ProjectError(Exception):
-	def __init__(self, *args, **kwargs):
-		super(ProjectError, self).__init__(*args, **kwargs)
+	pass
+
+class ProjectFileNotFoundError(FileNotFoundError):
+	pass
+
+class ProjectExistsError(FileExistsError):
+	pass

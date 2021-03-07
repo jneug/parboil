@@ -20,7 +20,6 @@ from colorama import Fore, Back, Style
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 import parboil.console as console
-import parboil.fields as fields
 
 from .version import __version__
 from .project import Project, Repository, ProjectError, ProjectFileNotFoundError, ProjectExistsError
@@ -268,17 +267,7 @@ def use(ctx, template, out, hard, value):
 			for k, v in value:
 				prefilled[k] = v
 
-		for key, descr in project.fields.items():
-			value = None
-			if key in prefilled:
-				value = prefilled[key]
-
-			if type(descr) is dict and 'type' in descr:
-				field_callable = f'field_{descr["type"]}'
-				del descr["type"]
-
-				if hasattr(fields, field_callable):
-					project.variables[key] = getattr(fields, field_callable)(key=key, **descr, value=value, project=project)
+		project.fill(prefilled)
 
 	for success, file_in, file_out in project.compile(out):
 		if success:

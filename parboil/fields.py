@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import parboil.console as console
-
 import click
 from colorama import Fore, Back, Style
+
+
+import parboil.console as console
+
 
 def field_default(key, project, default = '', value=None):
 	if value:
@@ -57,5 +59,5 @@ def field_file_select(key, project, default=1, value=None, choices=list(), filen
 
 	project.templates.append(f'includes:{value}')
 	if filename:
-		project.config['files'][value] = filename
+		project.files[value] = filename
 	return value

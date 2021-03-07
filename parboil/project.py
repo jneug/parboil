@@ -12,6 +12,7 @@ from pathlib import Path
 import click
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
+import parboil.fields as fields
 from .ext import JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
 
 
@@ -53,7 +54,7 @@ class Project(object):
 
 
 		self.meta = dict()
-		self.config = dict()
+		self.files = dict()
 		self.fields = dict()
 		self.variables = dict()
 		self.templates = list()
@@ -84,25 +85,49 @@ class Project(object):
 			self.setup()
 
 		## project file
+		config = dict()
 		if self.project_file.exists():
 			with open(self.project_file) as f:
-				self.config = json.load(f)
+				config = json.load(f)
+				if 'files' not in config:
+					self.files = dict()
+				else:
+					self.files = config['files']
 		else:
 			raise ProjectFileNotFoundError('Project file not found.')
 
-		if 'fields' in self.config:
-			for k,v in self.config['fields'].items():
+		if 'fields' in config:
+			for k,v in config['fields'].items():
 				if type(v) is not dict:
 					self.fields[k] = dict(
 						type='default', default=v)
 				else:
 					self.fields[k] = v
-			del self.config['fields']
 
 		## metafile
 		if self.meta_file.is_file():
 			with open(self.meta_file) as f:
 				self.meta = {**self.meta, **json.load(f)}
+
+	def fill(self, prefilled=dict()):
+		# Read user input (if necessary)
+		for key, descr in self.fields.items():
+			value = None
+			if key in prefilled:
+				value = prefilled[key]
+
+			if type(descr) is dict and 'type' in descr:
+				if descr['type'] == 'project':
+					subproject = Project(descr['name'], self.root.parent)
+					subproject.setup(load_project=True)
+					subproject.fill({**prefilled, **self.variables})
+					self.templates.append(subproject)
+				else:
+					field_callable = f'field_{descr["type"]}'
+					del descr["type"]
+
+					if hasattr(fields, field_callable):
+						self.variables[key] = getattr(fields, field_callable)(key=key, **descr, value=value, project=self)
 
 	def compile(self, target_dir, jinja=None):
 		if not jinja:
@@ -123,45 +148,49 @@ class Project(object):
 
 		result = (list(), list())
 		for file in self.templates:
-			if type(file) is str:
-				file_in  = Path(file[9:]) if file.startswith('includes:') else Path(file)
+			if type(file) is Project:
+				for result in file.compile(target_dir):
+					yield result
 			else:
-				file_in = file
-			file_out = Path(file_in)
-			if str(file_in) in self.config['files']:
-				if type(self.config['files'][str(file_in)]) is str:
-					file_out = self.config['files'][str(file_in)]
+				if type(file) is str:
+					file_in  = Path(file[9:]) if file.startswith('includes:') else Path(file)
+				else:
+					file_in = file
+				file_out = Path(file_in)
+				if str(file_in) in self.files:
+					if type(self.files[str(file_in)]) is str:
+						file_out = self.files[str(file_in)]
 
-			rel_path = file_in.parent
-			abs_path = target_dir / rel_path
+				rel_path = file_in.parent
+				abs_path = target_dir / rel_path
 
-			# Set some dynamic values
-			boil_vars = dict(
-				TPLNAME = self._name,
-				RELDIR  = '' if rel_path.name == '' else str(rel_path),
-				ABSDIR  = str(abs_path),
-				OUTDIR  = str(target_dir)
-			)
+				# Set some dynamic values
+				boil_vars = dict(
+					TPLNAME = self._name,
+					RELDIR  = '' if rel_path.name == '' else str(rel_path),
+					ABSDIR  = str(abs_path),
+					OUTDIR  = str(target_dir)
+				)
 
-			path_render = jinja.from_string(str(file_out)).render(**self.variables, BOIL=boil_vars)
+				path_render = jinja.from_string(str(file_out)).render(**self.variables, BOIL=boil_vars)
 
-			boil_vars['FILENAME'] = Path(path_render).name
-			boil_vars['FILEPATH'] = path_render
+				boil_vars['FILENAME'] = Path(path_render).name
+				boil_vars['FILEPATH'] = path_render
 
-			# Render template
-			tpl_render = jinja.get_template(str(file)).render(**self.variables, BOIL=boil_vars)
+				# Render template
+				tpl_render = jinja.get_template(str(file)).render(**self.variables, BOIL=boil_vars)
 
-			path_render_abs = target_dir / path_render
-			if len(tpl_render) > 0:
-				if not path_render_abs.parent.exists():
-					path_render_abs.parent.mkdir(parents=True)
+				path_render_abs = target_dir / path_render
+				if len(tpl_render) > 0:
+					if not path_render_abs.parent.exists():
+						path_render_abs.parent.mkdir(parents=True)
 
-				with open(path_render_abs, 'w') as f:
-					f.write(tpl_render)
+					with open(path_render_abs, 'w') as f:
+						f.write(tpl_render)
 
-				yield (True, str(file), path_render)
-			else:
-				yield (False, str(file), '')
+					yield (True, str(file), path_render)
+				else:
+					yield (False, str(file), '')
 
 	def save(self):
 		"""Saves the current meta file to disk"""

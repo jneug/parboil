@@ -1,8 +1,5 @@
-----
-
+Metavariables stored in BOIL:
 
 {% for v in BOIL.items() %}
 {{ v }}
 {% endfor %}
-
-----

@@ -1,10 +1,11 @@
-Project: {{ Project }}
-Name: {{ Name }}
+Variables in this template:
 
-Foo: {{ Foo }}
-FooIdx: {{ Foo_index }}
+Project:        {{ Project }}
+Author:         {{ Author }}
 
-HelperFile: {{ HelperFile }}
+Filename:       {{ Filename }}
+Filename Index: {{ Filename_index }}
+
+SpecialInclude: {{ SpecialInclude }}
 
 {% extends "includes:base.txt" %}
-

@@ -120,9 +120,10 @@ class Project(object):
             if type(descr) is dict and "type" in descr:
                 if descr["type"] == "project":
                     subproject = Project(descr["name"], self.root.parent)
-                    subproject.setup(load_project=True)
-                    subproject.fill({**prefilled, **self.variables})
-                    self.templates.append(subproject)
+                    if subproject.is_project():
+                        subproject.setup(load_project=True)
+                        subproject.fill({**prefilled, **self.variables})
+                        self.templates.append(subproject)
                 else:
                     field_callable = f'field_{descr["type"]}'
                     del descr["type"]

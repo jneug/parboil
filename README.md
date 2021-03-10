@@ -110,7 +110,7 @@ The template uses [Jinjas syntax](https://jinja.palletsprojects.com/en/2.11.x/te
 
 You can use any Jinja [macros](https://jinja.palletsprojects.com/en/2.11.x/templates/#list-of-control-structures) and [filters](https://jinja.palletsprojects.com/en/2.11.x/templates/#list-of-builtin-filters) in your templates. `{{ Meeting|title }}` will tranform the value of "Meeting" into titlecase. `{% if IamModerator %}` is a conditional. 
 
-For more information read [the wiki page on template creation](wiki/creating_templates).
+For more information read [the wiki page on template creation](https://github.com/jneug/parboil/wiki/How-to-create-templates).
 
 ### Some more template creation
 

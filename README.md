@@ -1,8 +1,9 @@
-<center>
-<span style="font-size:800%">🍚</span>
-<h2>Parboil</h2>
-<p><strong>Project Boilerplate Generator</strong></p>
-</center> 
+<h1 align=center>
+:rice:
+<br>
+Parboil
+</h1>
+<p align=center><strong>Project Boilerplate Generator</strong></p>
 
 ![GitHub](https://img.shields.io/github/license/jneug/parboil)
 

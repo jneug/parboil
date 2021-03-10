@@ -87,9 +87,14 @@ class Project(object):
             with open(self.project_file) as f:
                 config = json.load(f)
                 if "files" not in config:
-                    self.files = dict()
-                else:
-                    self.files = config["files"]
+                    config["files"] = dict()
+
+                self.files = dict()
+                for file, data in config["files"].items():
+                    if type(data) is str:
+                        self.files[file] = dict(filename=data)
+                    else:
+                        self.files[file] = data
         else:
             raise ProjectFileNotFoundError("Project file not found.")
 
@@ -186,8 +191,13 @@ class Project(object):
                     **self.variables, BOIL=boil_vars
                 )
 
-                path_render_abs = target_dir / path_render
-                if len(tpl_render) > 0:
+                generate_file = bool(tpl_render.strip())  # empty?
+                generate_file = self.files.get(str(file_in), dict()).get(
+                    "keep", generate_file
+                )
+
+                if generate_file:
+                    path_render_abs = target_dir / path_render
                     if not path_render_abs.parent.exists():
                         path_render_abs.parent.mkdir(parents=True)
 

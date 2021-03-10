@@ -84,5 +84,5 @@ def field_file_select(
 
     project.templates.append(f"includes:{value}")
     if filename:
-        project.files[value] = filename
+        project.files[value] = {"filename": filename}
     return value

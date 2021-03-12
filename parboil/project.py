@@ -158,16 +158,11 @@ class Project(object):
                 for result in file.compile(target_dir):
                     yield result
             else:
-                if type(file) is str:
-                    file_in = (
-                        Path(file[9:]) if file.startswith("includes:") else Path(file)
-                    )
-                else:
-                    file_in = file
-                file_out = Path(file_in)
+                file_in = Path(str(file).removeprefix('includes:'))
+                file_out = file_in
                 if str(file_in) in self.files:
-                    if type(self.files[str(file_in)]) is str:
-                        file_out = self.files[str(file_in)]
+                    if 'filename' in self.files[str(file_in)]:
+                        file_out = self.files[str(file_in)]['filename']
 
                 rel_path = file_in.parent
                 abs_path = target_dir / rel_path

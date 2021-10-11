@@ -85,10 +85,13 @@ def boil(ctx, config, tpldir):
     ctx.obj["TPLDIR"] = Path(ctx.obj["TPLDIR"])
 
 
-@boil.command()
+@boil.command(short_help="List installed templates")
 @click.option("-p", "--plain", is_flag=True)
 @pass_tpldir
 def list(TPLDIR, plain):
+    """
+    Lists all templates in the current local repository.
+    """
     repo = Repository(TPLDIR)
     if repo.exists():
         if len(repo) > 0:
@@ -126,7 +129,7 @@ def list(TPLDIR, plain):
         exit(1)
 
 
-@boil.command()
+@boil.command(short_help="Install a new project template")
 @click.option(
     "-f",
     "--force",
@@ -212,7 +215,7 @@ def install(ctx, source, template, force, download, is_repo):
             )
 
 
-@boil.command()
+@boil.command(short_help="Uninstall an existing template")
 @click.option("-f", "--force", is_flag=True)
 @click.argument("template")
 @pass_tpldir
@@ -245,7 +248,7 @@ def uninstall(TPLDIR, force, template):
         console.warn(f"Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist")
 
 
-@boil.command()
+@boil.command(short_help="Update an existing template")
 @click.argument("template")
 @click.pass_context
 def update(ctx, template):
@@ -286,7 +289,7 @@ def update(ctx, template):
             )
 
 
-@boil.command()
+@boil.command(short_help="Use an existing template")
 @click.option(
     "--hard",
     is_flag=True,

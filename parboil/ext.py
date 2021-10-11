@@ -1,6 +1,11 @@
 # -*- coding: utf-8 -*-
 
-import unicodedata, re
+import os
+import re
+import string
+import unicodedata
+import platform
+
 from datetime import datetime
 from functools import update_wrapper
 
@@ -55,12 +60,33 @@ class JinjaTimeExtension(Extension):
         return nodes.Output([call_method], lineno=lineno)
 
 
-def jinja_filter_fileify(s):
+valid_filename_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
+default_replace = dict(ä='ae', ö='oe', ü='ue', ß='ss')
+
+
+def jinja_filter_fileify(s, sep="_", replace=default_replace):
     """
     Django util.text.get_valid_filename
     """
-    s = str(s).strip().replace(" ", "_")
-    return re.sub(r"(?u)[^-\w.]", "", s)
+    # s = str(s).strip().replace(" ", "_")
+    # return re.sub(r"(?u)[^-\w.]", "", s)
+
+    # https://gist.github.com/wassname/1393c4a57cfcbf03641dbc31886123b8
+    # replace spaces
+    s = str(s).strip().replace(" ", sep)
+    for k, v in replace.items():
+        s = s.replace(k, v)
+
+    # keep only valid ascii chars
+    s = (
+        unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode()
+    )
+
+    if "windows" in platform.system().lower():
+        if len(s) > 255:
+            s, ext = os.path.splitext(s)
+            return s[:(char_limit - len(ext))] + ext
+    return s
 
 
 def jinja_filter_slugify(value, allow_unicode=False):
@@ -73,8 +99,8 @@ def jinja_filter_slugify(value, allow_unicode=False):
     else:
         value = (
             unicodedata.normalize("NFKD", value)
-            .encode("ascii", "ignore")
-            .decode("ascii")
+                .encode("ascii", "ignore")
+                .decode("ascii")
         )
     value = re.sub(r"[^\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")

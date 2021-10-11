@@ -13,7 +13,7 @@ import click
 from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
 
 import parboil.fields as fields
-from .ext import JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify
+from .ext import JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify, jinja_filter_roman, jinja_filter_time
 
 
 PRJ_FILE = "project.json"
@@ -149,6 +149,8 @@ class Project(object):
             )
             jinja.filters["fileify"] = jinja_filter_fileify
             jinja.filters["slugify"] = jinja_filter_slugify
+            jinja.filters["roman"] = jinja_filter_roman
+            jinja.filters["time"] = jinja_filter_time
 
         target_dir = Path(target_dir).resolve()
 

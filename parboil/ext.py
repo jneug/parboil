@@ -78,3 +78,28 @@ def jinja_filter_slugify(value, allow_unicode=False):
         )
     value = re.sub(r"[^\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
+
+
+def jinja_filter_roman(value):
+    """ Convert an integer to a Roman numeral.
+    https://www.oreilly.com/library/view/python-cookbook/0596001673/ch03s24.html
+    """
+
+    if not isinstance(value, type(1)):
+        return value
+    if not 0 < value < 4000:
+        return value
+    ints = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
+    nums = (
+    'M', 'CM', 'D', 'CD', 'C', 'XC', 'L', 'XL', 'X', 'IX', 'V', 'IV', 'I')
+    result = []
+    for i in range(len(ints)):
+        count = int(value / ints[i])
+        result.append(nums[i] * count)
+        value -= ints[i] * count
+    return ''.join(result)
+
+
+def jinja_filter_time(value):
+    """Pass the value to datetime.now().strftime()"""
+    return datetime.now().strftime(value)

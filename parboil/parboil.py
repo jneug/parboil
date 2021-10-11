@@ -34,6 +34,8 @@ from .ext import (
     JinjaTimeExtension,
     jinja_filter_fileify,
     jinja_filter_slugify,
+    jinja_filter_roman,
+    jinja_filter_time
 )
 
 

@@ -175,6 +175,7 @@ class Project(object):
                     RELDIR="" if rel_path.name == "" else str(rel_path),
                     ABSDIR=str(abs_path),
                     OUTDIR=str(target_dir),
+                    OUTNAME=str(target_dir.name)
                 )
 
                 path_render = jinja.from_string(str(file_out)).render(
@@ -252,11 +253,12 @@ class Repository(object):
 
     def load(self):
         self._projects = list()
-        for child in self._root.iterdir():
-            if child.is_dir():
-                project_file = child / PRJ_FILE
-                if project_file.is_file():
-                    self._projects.append(child.name)
+        if self.exists():
+            for child in self._root.iterdir():
+                if child.is_dir():
+                    project_file = child / PRJ_FILE
+                    if project_file.is_file():
+                        self._projects.append(child.name)
 
     def __len__(self):
         return len(self._projects)

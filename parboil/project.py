@@ -179,7 +179,7 @@ class Project(object):
                 )
 
                 path_render = jinja.from_string(str(file_out)).render(
-                    **self.variables, BOIL=boil_vars
+                    **self.variables, BOIL=boil_vars, ENV=os.environ
                 )
 
                 boil_vars["FILENAME"] = Path(path_render).name
@@ -187,7 +187,7 @@ class Project(object):
 
                 # Render template
                 tpl_render = jinja.get_template(str(file)).render(
-                    **self.variables, BOIL=boil_vars
+                    **self.variables, BOIL=boil_vars, ENV=os.environ
                 )
 
                 generate_file = bool(tpl_render.strip())  # empty?

@@ -2,6 +2,7 @@ todo.md
 test/out/
 test/repo/
 
+.idea
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -29,6 +29,8 @@ class Project(object):
         else:
             self._repo = None
             self._root_dir = (Path(repository) / self._name).resolve()
+        # Cache for jinja environemnt
+        self._jinja = None
 
     @property
     def name(self):
@@ -110,12 +112,19 @@ class Project(object):
             with open(self.meta_file) as f:
                 self.meta = {**self.meta, **json.load(f)}
 
-    def fill(self, prefilled=dict()):
-        # Read user input (if necessary)
+    def fill(self, prefilled=dict(), jinja=None):
+        """Read user input (if necessary)"""
+
+        if not jinja:
+            jinja = self._create_jinja()
+
         for key, descr in self.fields.items():
             value = None
             if key in prefilled:
-                value = prefilled[key]
+                value = jinja.from_string(prefilled[key]).render(
+                    **self.variables, BOIL=dict(TPLNAME=self._name),
+                    ENV=os.environ
+                )
 
             if type(descr) is dict and "type" in descr:
                 if descr["type"] == "project":
@@ -129,28 +138,29 @@ class Project(object):
                     del descr["type"]
 
                     if hasattr(fields, field_callable):
+                        # If there is a default value, compile it with jinja
+                        # to replace existing jinja tags.
+                        if 'default' in descr:
+                            descr['default'] = jinja.from_string(descr['default']).render(
+                                **self.variables, BOIL=dict(TPLNAME=self._name),
+                                ENV=os.environ
+                            )
+
+                        # Ask for user input
                         self.variables[key] = getattr(fields, field_callable)(
                             key=key, **descr, value=value, project=self
                         )
 
+                        # Send the variable through another jinja pass, if
+                        # the user put some tags into the value.
+                        self.variables[key] = jinja.from_string(self.variables[key]).render(
+                            **self.variables, BOIL=dict(TPLNAME=self._name),
+                            ENV=os.environ
+                        )
+
     def compile(self, target_dir, jinja=None):
         if not jinja:
-            jinja = Environment(
-                loader=ChoiceLoader(
-                    [
-                        FileSystemLoader(self.templates_dir),
-                        PrefixLoader(
-                            {"includes": FileSystemLoader(self.includes_dir)},
-                            delimiter=":",
-                        ),
-                    ]
-                ),
-                extensions=[JinjaTimeExtension],
-            )
-            jinja.filters["fileify"] = jinja_filter_fileify
-            jinja.filters["slugify"] = jinja_filter_slugify
-            jinja.filters["roman"] = jinja_filter_roman
-            jinja.filters["time"] = jinja_filter_time
+            jinja = self._create_jinja()
 
         target_dir = Path(target_dir).resolve()
 
@@ -206,6 +216,28 @@ class Project(object):
                     yield (True, str(file), path_render)
                 else:
                     yield (False, str(file), "")
+
+    def _create_jinja(self):
+        """Creates a jinja Environment for this project and caches it"""
+        if not self._jinja:
+            self._jinja = Environment(
+                loader=ChoiceLoader(
+                    [
+                        FileSystemLoader(self.templates_dir),
+                        PrefixLoader(
+                            {"includes": FileSystemLoader(self.includes_dir)},
+                            delimiter=":",
+                        ),
+                    ]
+                ),
+                extensions=[JinjaTimeExtension],
+            )
+            self._jinja.filters["fileify"] = jinja_filter_fileify
+            self._jinja.filters["slugify"] = jinja_filter_slugify
+            self._jinja.filters["roman"]   = jinja_filter_roman
+            self._jinja.filters["time"]    = jinja_filter_time
+
+        return self._jinja
 
     def save(self):
         """Saves the current meta file to disk"""

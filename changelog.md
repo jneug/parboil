@@ -1,3 +1,7 @@
+### Version 0.7.7
+
+- Moved to Poetry for project management
+
 ### Version 0.7.6
 
 - Added `time` filter for strings to allow usage in conditionals (e.g. `{% if '%m'|time|int < 8 %}`).

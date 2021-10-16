@@ -3,6 +3,7 @@ test/out/
 test/repo/
 
 .idea
+.vscode
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

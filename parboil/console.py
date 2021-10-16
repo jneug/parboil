@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import click
-from colorama import Fore, Back, Style
+from colorama import Back, Fore, Style
 
 
 def printd(msg, echo=click.echo, decor=""):

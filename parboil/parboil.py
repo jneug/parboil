@@ -7,37 +7,25 @@ Parboil lets you generate boilerplate projects from template files.
 Run boil --help for more info.
 """
 
+import json
 import os
 import re
-import subprocess
-import json
 import shutil
+import subprocess
 import time
 from pathlib import Path
 
 import click
-from colorama import Fore, Back, Style
-from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
+from colorama import Back, Fore, Style
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.console as console
 
+from .ext import (JinjaTimeExtension, jinja_filter_fileify, jinja_filter_roman,
+                  jinja_filter_slugify, jinja_filter_time, pass_tpldir)
+from .project import (Project, ProjectError, ProjectExistsError,
+                      ProjectFileNotFoundError, Repository)
 from .version import __version__
-from .project import (
-    Project,
-    Repository,
-    ProjectError,
-    ProjectFileNotFoundError,
-    ProjectExistsError,
-)
-from .ext import (
-    pass_tpldir,
-    JinjaTimeExtension,
-    jinja_filter_fileify,
-    jinja_filter_slugify,
-    jinja_filter_roman,
-    jinja_filter_time
-)
-
 
 # set global defaults
 CFG_FILE = "config.json"
@@ -83,6 +71,7 @@ def boil(ctx, config, tpldir):
     if tpldir:
         ctx.obj["TPLDIR"] = tpldir
     ctx.obj["TPLDIR"] = Path(ctx.obj["TPLDIR"])
+
 
 @boil.command(short_help="List installed templates")
 @click.option("-p", "--plain", is_flag=True)

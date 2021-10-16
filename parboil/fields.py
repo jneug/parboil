@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import click
-from colorama import Fore, Back, Style
-
+from colorama import Back, Fore, Style
 
 import parboil.console as console
 
@@ -56,7 +55,7 @@ def field_choice(key, project, default=1, value=None, choices=list()):
             n = 1
         project.variables[f"{key}_index"] = n - 1
         return choices[n - 1]
-        
+
 
 def field_dict(key, project, default=1, value=None, choices=dict()):
     if value and value in choices:

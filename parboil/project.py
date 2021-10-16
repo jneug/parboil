@@ -1,20 +1,21 @@
 # -*- coding: utf-8 -*-
 
+import json
 import os
 import re
-import subprocess
-import json
 import shutil
-import time
+import subprocess
 import tempfile
+import time
 from pathlib import Path
 
 import click
-from jinja2 import Environment, FileSystemLoader, ChoiceLoader, PrefixLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.fields as fields
-from .ext import JinjaTimeExtension, jinja_filter_fileify, jinja_filter_slugify, jinja_filter_roman, jinja_filter_time
 
+from .ext import (JinjaTimeExtension, jinja_filter_fileify, jinja_filter_roman,
+                  jinja_filter_slugify, jinja_filter_time)
 
 PRJ_FILE = "project.json"
 META_FILE = ".parboil"
@@ -156,8 +157,8 @@ class Project(object):
 
     def compile(self, target_dir, jinja=None):
         """
-        Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder. 
-        
+        Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder.
+
         Yields a tuple with three values for each template file:
             1. (bool) If an output file was generated
             2. (str) The original file
@@ -194,7 +195,7 @@ class Project(object):
                 path_render = jinja.from_string(file_out).render(
                     **self.variables, BOIL=boil_vars, ENV=os.environ
                 )
-                
+
                 if Path(path_render).exists() and not file_cfg.get('overwrite', True):
                     yield (False, file_in, "")
                     continue

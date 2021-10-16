@@ -1,16 +1,14 @@
 # -*- coding: utf-8 -*-
 
 import os
+import platform
 import re
 import string
 import unicodedata
-import platform
-
 from datetime import datetime
 from functools import update_wrapper
 
 from click import pass_context
-
 from jinja2 import nodes
 from jinja2.ext import Extension
 
@@ -61,7 +59,7 @@ class JinjaTimeExtension(Extension):
 
 
 valid_filename_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
-default_replace = dict(ä='ae', ö='oe', ü='ue', ß='ss')
+default_replace = dict(ä="ae", ö="oe", ü="ue", ß="ss")
 
 
 def jinja_filter_fileify(s, sep="_", replace=default_replace):
@@ -78,14 +76,12 @@ def jinja_filter_fileify(s, sep="_", replace=default_replace):
         s = s.replace(k, v)
 
     # keep only valid ascii chars
-    s = (
-        unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode()
-    )
+    s = unicodedata.normalize("NFKD", s).encode("ASCII", "ignore").decode()
 
     if "windows" in platform.system().lower():
         if len(s) > 255:
             s, ext = os.path.splitext(s)
-            return s[:(char_limit - len(ext))] + ext
+            return s[: (char_limit - len(ext))] + ext
     return s
 
 
@@ -99,15 +95,15 @@ def jinja_filter_slugify(value, allow_unicode=False):
     else:
         value = (
             unicodedata.normalize("NFKD", value)
-                .encode("ascii", "ignore")
-                .decode("ascii")
+            .encode("ascii", "ignore")
+            .decode("ascii")
         )
     value = re.sub(r"[^\w\s-]", "", value.lower())
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
 def jinja_filter_roman(value):
-    """ Convert an integer to a Roman numeral.
+    """Convert an integer to a Roman numeral.
     https://www.oreilly.com/library/view/python-cookbook/0596001673/ch03s24.html
     """
 
@@ -116,14 +112,13 @@ def jinja_filter_roman(value):
     if not 0 < value < 4000:
         return value
     ints = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
-    nums = (
-    'M', 'CM', 'D', 'CD', 'C', 'XC', 'L', 'XL', 'X', 'IX', 'V', 'IV', 'I')
+    nums = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
     result = []
     for i in range(len(ints)):
         count = int(value / ints[i])
         result.append(nums[i] * count)
         value -= ints[i] * count
-    return ''.join(result)
+    return "".join(result)
 
 
 def jinja_filter_time(value):

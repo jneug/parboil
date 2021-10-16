@@ -113,8 +113,8 @@ class Project(object):
                 self.meta = {**self.meta, **json.load(f)}
 
     def fill(self, prefilled=dict(), jinja=None):
-        """Read user input (if necessary)"""
-
+        """
+        Get field values either from the prefilled values or read user input.
         if not jinja:
             jinja = self._create_jinja()
 
@@ -154,11 +154,15 @@ class Project(object):
                         # Send the variable through another jinja pass, if
                         # the user put some tags into the value.
                         self.variables[key] = jinja.from_string(self.variables[key]).render(
-                            **self.variables, BOIL=dict(TPLNAME=self._name),
                             ENV=os.environ
                         )
 
     def compile(self, target_dir, jinja=None):
+        Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder. 
+        Yields a tuple with three values for each template file:
+            2. (str) The original file
+            3. (str) The output file after compilation (if any)
+        """
         if not jinja:
             jinja = self._create_jinja()
 

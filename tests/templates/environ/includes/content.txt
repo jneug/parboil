@@ -1,0 +1,13 @@
+Environment variables:
+
+
+BOIL
+{% for k,v in BOIL %}
+- {{k}} = {{v}}
+{% endfor %}
+
+
+ENV
+{% for k,v in ENV %}
+- {{k}} = {{v}}
+{% endfor %}

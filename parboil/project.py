@@ -152,12 +152,6 @@ class Project(object):
                             key=key, **descr, value=value, project=self
                         )
 
-                        # Send the variable through another jinja pass, if
-                        # the user put some tags into the value.
-                        self.variables[key] = jinja.from_string(self.variables[key]).render(
-                            ENV=os.environ
-                        )
-
     def compile(self, target_dir, jinja=None):
         Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder. 
         Yields a tuple with three values for each template file:

@@ -33,7 +33,7 @@ def field_default(key, project, default="", value=None):
 
 
 def field_choice(key, project, default=1, value=None, choices=list()):
-    if value:
+    if value and value < len(choices):
         console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
         project.variables[f"{key}_index"] = value
         return choices[value]
@@ -56,6 +56,40 @@ def field_choice(key, project, default=1, value=None, choices=list()):
             n = 1
         project.variables[f"{key}_index"] = n - 1
         return choices[n - 1]
+        
+
+def field_dict(key, project, default=1, value=None, choices=dict()):
+    if value and value in choices:
+        console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
+        project.variables[f"{key}_key"] = value
+        return choices[value]
+    else:
+        keys = choices.keys()
+        if len(keys) > 1:
+            console.question(
+                f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
+                echo=click.echo,
+            )
+            for n, choice in enumerate(choices.keys()):
+                console.indent(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} - "{choice}"')
+            n = click.prompt(
+                console.indent(f"Select from 1..{len(choices.keys())}", echo=None),
+                default=default,
+            )
+            if n > len(choices.keys()):
+                console.warn(f"{n} is not a valid choice. Using default.")
+                if default in choices:
+                    k = default
+                else:
+                    k = choices.keys()[default]
+        else:
+            k = choices.keys()[0]
+        project.variables[f"{key}_key"] = k
+        return choices[k]
+
+
+def field_mchoice(key, project, default=1, value=None, choices=list()):
+    return value
 
 
 def field_file_select(

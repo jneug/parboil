@@ -105,6 +105,8 @@ class Project(object):
                 if type(v) is not dict:
                     self.fields[k] = dict(type="default", default=v)
                 else:
+                    if "type" not in v:
+                        v["type"] = "dict"
                     self.fields[k] = v
 
         ## metafile
@@ -153,8 +155,11 @@ class Project(object):
                         )
 
     def compile(self, target_dir, jinja=None):
+        """
         Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder. 
+        
         Yields a tuple with three values for each template file:
+            1. (bool) If an output file was generated
             2. (str) The original file
             3. (str) The output file after compilation (if any)
         """
@@ -170,10 +175,9 @@ class Project(object):
                     yield result
             else:
                 file_in = Path(str(file).removeprefix('includes:'))
-                file_out = file_in
-                if str(file_in) in self.files:
-                    if 'filename' in self.files[str(file_in)]:
-                        file_out = self.files[str(file_in)]['filename']
+                file_out = str(file_in)
+                file_cfg = self.files.get(str(file_in), dict())
+                file_out = file_cfg.get('filename', file_out)
 
                 rel_path = file_in.parent
                 abs_path = target_dir / rel_path
@@ -187,22 +191,27 @@ class Project(object):
                     OUTNAME=str(target_dir.name)
                 )
 
-                path_render = jinja.from_string(str(file_out)).render(
+                path_render = jinja.from_string(file_out).render(
                     **self.variables, BOIL=boil_vars, ENV=os.environ
                 )
+                
+                if Path(path_render).exists() and not file_cfg.get('overwrite', True):
+                    yield (False, file_in, "")
+                    continue
 
                 boil_vars["FILENAME"] = Path(path_render).name
                 boil_vars["FILEPATH"] = path_render
 
-                # Render template
-                tpl_render = jinja.get_template(str(file)).render(
-                    **self.variables, BOIL=boil_vars, ENV=os.environ
-                )
+                if file_cfg.get('compile', True):
+                    # Render template
+                    tpl_render = jinja.get_template(str(file)).render(
+                        **self.variables, BOIL=boil_vars, ENV=os.environ
+                    )
+                else:
+                    tpl_render = file.read_text()
 
                 generate_file = bool(tpl_render.strip())  # empty?
-                generate_file = self.files.get(str(file_in), dict()).get(
-                    "keep", generate_file
-                )
+                generate_file = file_cfg.get("keep", generate_file)
 
                 if generate_file:
                     path_render_abs = target_dir / path_render

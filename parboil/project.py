@@ -115,6 +115,7 @@ class Project(object):
     def fill(self, prefilled=dict(), jinja=None):
         """
         Get field values either from the prefilled values or read user input.
+        """
         if not jinja:
             jinja = self._create_jinja()
 

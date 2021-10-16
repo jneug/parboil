@@ -29,7 +29,7 @@ class Project(object):
         else:
             self._repo = None
             self._root_dir = (Path(repository) / self._name).resolve()
-        # Cache for jinja environemnt
+        # Cache for jinja environment
         self._jinja = None
 
     @property
@@ -311,7 +311,7 @@ class Repository(object):
         return Project(template, self)
 
     def install_from_directory(self, template, source, hard=False, is_repo=False):
-        """IF source contains a valid project template it is installed
+        """If source contains a valid project template it is installed
         into this local repository and the Project object is returned.
         """
         if self.is_installed(template):

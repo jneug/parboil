@@ -84,7 +84,6 @@ def boil(ctx, config, tpldir):
         ctx.obj["TPLDIR"] = tpldir
     ctx.obj["TPLDIR"] = Path(ctx.obj["TPLDIR"])
 
-
 @boil.command(short_help="List installed templates")
 @click.option("-p", "--plain", is_flag=True)
 @pass_tpldir

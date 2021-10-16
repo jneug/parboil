@@ -14,8 +14,13 @@ from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.fields as fields
 
-from .ext import (JinjaTimeExtension, jinja_filter_fileify, jinja_filter_roman,
-                  jinja_filter_slugify, jinja_filter_time)
+from .ext import (
+    JinjaTimeExtension,
+    jinja_filter_fileify,
+    jinja_filter_roman,
+    jinja_filter_slugify,
+    jinja_filter_time,
+)
 
 PRJ_FILE = "project.json"
 META_FILE = ".parboil"
@@ -126,8 +131,7 @@ class Project(object):
             value = None
             if key in prefilled:
                 value = jinja.from_string(prefilled[key]).render(
-                    **self.variables, BOIL=dict(TPLNAME=self._name),
-                    ENV=os.environ
+                    **self.variables, BOIL=dict(TPLNAME=self._name), ENV=os.environ
                 )
 
             if type(descr) is dict and "type" in descr:
@@ -144,10 +148,13 @@ class Project(object):
                     if hasattr(fields, field_callable):
                         # If there is a default value, compile it with jinja
                         # to replace existing jinja tags.
-                        if 'default' in descr:
-                            descr['default'] = jinja.from_string(descr['default']).render(
-                                **self.variables, BOIL=dict(TPLNAME=self._name),
-                                ENV=os.environ
+                        if "default" in descr:
+                            descr["default"] = jinja.from_string(
+                                descr["default"]
+                            ).render(
+                                **self.variables,
+                                BOIL=dict(TPLNAME=self._name),
+                                ENV=os.environ,
                             )
 
                         # Ask for user input
@@ -175,10 +182,10 @@ class Project(object):
                 for result in file.compile(target_dir):
                     yield result
             else:
-                file_in = Path(str(file).removeprefix('includes:'))
+                file_in = Path(str(file).removeprefix("includes:"))
                 file_out = str(file_in)
                 file_cfg = self.files.get(str(file_in), dict())
-                file_out = file_cfg.get('filename', file_out)
+                file_out = file_cfg.get("filename", file_out)
 
                 rel_path = file_in.parent
                 abs_path = target_dir / rel_path
@@ -189,21 +196,21 @@ class Project(object):
                     RELDIR="" if rel_path.name == "" else str(rel_path),
                     ABSDIR=str(abs_path),
                     OUTDIR=str(target_dir),
-                    OUTNAME=str(target_dir.name)
+                    OUTNAME=str(target_dir.name),
                 )
 
                 path_render = jinja.from_string(file_out).render(
                     **self.variables, BOIL=boil_vars, ENV=os.environ
                 )
 
-                if Path(path_render).exists() and not file_cfg.get('overwrite', True):
+                if Path(path_render).exists() and not file_cfg.get("overwrite", True):
                     yield (False, file_in, "")
                     continue
 
                 boil_vars["FILENAME"] = Path(path_render).name
                 boil_vars["FILEPATH"] = path_render
 
-                if file_cfg.get('compile', True):
+                if file_cfg.get("compile", True):
                     # Render template
                     tpl_render = jinja.get_template(str(file)).render(
                         **self.variables, BOIL=boil_vars, ENV=os.environ
@@ -243,8 +250,8 @@ class Project(object):
             )
             self._jinja.filters["fileify"] = jinja_filter_fileify
             self._jinja.filters["slugify"] = jinja_filter_slugify
-            self._jinja.filters["roman"]   = jinja_filter_roman
-            self._jinja.filters["time"]    = jinja_filter_time
+            self._jinja.filters["roman"] = jinja_filter_roman
+            self._jinja.filters["time"] = jinja_filter_time
 
         return self._jinja
 
@@ -378,7 +385,7 @@ class Repository(object):
                                 child.name, child, hard=hard
                             )
                             projects.append(project)
-                        except:
+                        except ProjectFileNotFoundError:
                             pass
 
             self.load()
@@ -435,7 +442,9 @@ class Repository(object):
                                 project.save()
 
                                 projects.append(project)
-                            except:
+                            except ProjectFileNotFoundError:
+                                pass
+                            except ProjectExistsError:
                                 pass
 
             self.load()
@@ -459,7 +468,7 @@ class Repository(object):
             if child.is_dir():
                 project_file = child / PRJ_FILE
                 if project_file.is_file():
-                    if not child.name in self._projects:
+                    if child.name not in self._projects:
                         diff.append(child.name)
                         self._projects.append(child.name)
         self._projects.sort()

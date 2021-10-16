@@ -186,7 +186,7 @@ def install(ctx, source, template, force, download, is_repo):
             echo=ctx.fail,
         )
     else:
-        if type(projects) is type([]):
+        if isinstance(projects, list):
             for project in projects:
                 console.success(
                     f"Installed template {Style.BRIGHT}{project.name}{Style.RESET_ALL}"
@@ -224,12 +224,12 @@ def uninstall(TPLDIR, force, template):
                 console.success(
                     f"Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}"
                 )
-            except:
+            except OSError:
                 console.error(
                     f"Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}"
                 )
                 console.line(
-                    f"You might need to manually delete the template directory at"
+                    "You might need to manually delete the template directory at"
                 )
                 console.line(f"{Style.BRIGHT}{repo.root}{Style.RESET_ALL}")
     else:
@@ -321,8 +321,6 @@ def use(ctx, template, out, hard, value):
         out = Path(out)
 
     if out.exists() and len(os.listdir(out)) > 0:
-        # log_warn(f'The output directory exists and is not empty.')
-        # answ = log_question(f'Do you want to [{Style.BRIGHT}O{Style.RESET_ALL}]verwrite, [{Style.BRIGHT}M{Style.RESET_ALL}]erge or [{Style.BRIGHT}A{Style.RESET_ALL}]bort [o/m/a]')
         if hard:
             shutil.rmtree(out)
             out.mkdir(parents=True)

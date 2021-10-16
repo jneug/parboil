@@ -1,0 +1,33 @@
+{
+  "fields": {
+    "Project": "Test",
+    "Author": "Name",
+    "Filename": [
+      "file_a.py",
+      "file_b.py",
+      "file_c.py",
+      "file_d.py"
+    ],
+    "SpecialInclude": {
+      "type": "file_select",
+      "choices": [
+        "a.txt",
+        "b.txt",
+        "c.txt"
+      ],
+      "default": 1,
+      "filename": "{% time '%Y' %}/include.txt"
+    },
+    "LICENSE": {
+      "type": "project",
+      "name": "license"
+    }
+  },
+  "files": {
+    "subfolder/rename_me.txt": "subfolder/{% time '%H_00' %}_{{ Project|fileify }}.txt",
+    "rename_and_move_me.txt": "{% time '%Y' %}/{% time '%Y-%d-%m' %}_{{ Filename }}.txt",
+    "empty/.gitkeep": {
+    	"keep": true
+    }
+  }
+}

@@ -1,6 +1,34 @@
+[tool.poetry]
+name = "parboil"
+version = "0.7.7"
+description = "Create reusable boilerplate templates to kickstart your next project."
+authors = ["J. Neugebauer <github@neugebauer.cc>"]
+license = "MIT"
+readme = "README.md"
+homepage = "http://github.com/jneug/parboil"
+repository = "http://github.com/jneug/parboil"
+classifiers = [
+		"Programming Language :: Python :: 3",
+    "Operating System :: MacOS",
+    "Operating System :: Unix",
+    "Operating System :: POSIX"
+	]
+
+[tool.poetry.dependencies]
+python = "^3.6.2"
+click = "^8.0.3"
+colorama = "^0.4.4"
+Jinja2 = "^3.0.2"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.5"
+isort = "^5.9.3"
+black = "^21.9b0"
+flake8 = "^4.0.1"
+
+[tool.poetry.scripts]
+boil = "parboil.parboil:boil"
+
 [build-system]
-requires = [
-    "setuptools>=42",
-    "wheel"
-]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

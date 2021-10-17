@@ -1,9 +1,0 @@
-{
-  "fields": {
-      "Project": "Test",
-      "Filename": "{% time '%Y' %}_include.txt"
-  },
-  "files": {
-    "file.txt": "{{ Filename }}"
-  }
-}

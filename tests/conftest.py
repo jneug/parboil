@@ -9,9 +9,23 @@ import pytest
 from click.testing import CliRunner
 
 
+@pytest.fixture(autouse=True)
+def mock_home(monkeypatch, tmp_path):
+    """Monkeypatch the user home folder."""
+    root_path = tmp_path.joinpath("home")
+    root_path.mkdir()
+    #config_path = root_path.joinpath(".config", "parboil")
+    #config_path.mkdirs(parents=True)
+
+    monkeypatch.setenv("HOME", str(root_path))
+    monkeypatch.setenv("USERPROFILE", str(root_path))
+
+
 @pytest.fixture()
 def config_file(tmp_path, repo_path):
-    """Create a temporary repository folder"""
+    """
+    Create a temporary repository folder
+    """
     config_file = tmp_path / "config.json"
     if not config_file.is_file():
         config_file.write_text(
@@ -22,28 +36,26 @@ def config_file(tmp_path, repo_path):
 
 
 @pytest.fixture()
-def tpl_path(tmp_path):
-    """Create a temporary repository folder"""
-    tpl_dir = tmp_path / "tmp_templates"
-    if not tpl_dir.is_dir():
-        # repo_dir.mkdir()
-        shutil.copytree("tests/templates", tpl_dir)
-
-    return tpl_dir
+def tpl_path(request):
+    """Get the path to the test folder"""
+    #return request.fspath / "templates"
+    return Path("tests/templates")
 
 
 @pytest.fixture()
 def repo_path(tmp_path):
-    """Create a temporary repository folder"""
-    repo_dir = tmp_path / "tmp_repository"
-    repo_dir.mkdir(exist_ok=True)
+    """
+    Create a temporary repository folder
+    """
+    repo_dir = tmp_path / "repository"
+    repo_dir.mkdir()
     return repo_dir
 
 
 @pytest.fixture()
 def out_path(tmp_path):
     """Create a temporary repository folder"""
-    out_dir = tmp_path / "tmp_output"
+    out_dir = tmp_path / "output"
     out_dir.mkdir(exist_ok=True)
 
     return out_dir
@@ -51,34 +63,9 @@ def out_path(tmp_path):
 
 @pytest.fixture()
 def boil_runner(repo_path):
-    return BoilRunner(repo_path)
-
-
-class BoilRunner(CliRunner):
-    def __init__(self, repo_path, *args, **kwargs):
-        super(BoilRunner, self).__init__(*args, **kwargs)
-        self.repo_path = repo_path
-
-    def invoke(
-        self,
-        cli,
-        args=None,
-        input=None,
-        env=None,
-        catch_exceptions=True,
-        color=False,
-        **extra
-    ):
-        if not args:
-            args = list()
-        if type(args) is list and '--tpldir' not in args:
-            args = ["--tpldir", str(self.repo_path)] + args
-        return super(BoilRunner, self).invoke(
-            cli,
-            args=args,
-            input=input,
-            env=env,
-            catch_exceptions=catch_exceptions,
-            color=color,
-            **extra
-        )
+    runner = CliRunner()
+    
+    def boil_run(*args, **kwargs):
+        return runner.invoke("boil", args, **kwargs)
+    
+    return boil_run

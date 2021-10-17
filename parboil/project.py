@@ -45,6 +45,10 @@ class Project(object):
     @property
     def root(self):
         return self._root_dir
+    
+    @property
+    def is_symlinked(self):
+        return self._root_dir.is_symlink()
 
     def exists(self):
         return self._root_dir.is_dir()
@@ -326,7 +330,7 @@ class Repository(object):
     def get_project(self, template):
         return Project(template, self)
 
-    def install_from_directory(self, template, source, hard=False, is_repo=False):
+    def install_from_directory(self, template, source, hard=False, is_repo=False, symlink=False):
         """If source contains a valid project template it is installed
         into this local repository and the Project object is returned.
         """
@@ -359,17 +363,22 @@ class Repository(object):
 
             project = self.get_project(template)
 
-            # copy files
-            shutil.copytree(source, project.root)
-
-            # create meta file
-            project.setup()
-            project.meta = {
-                "created": time.time(),
-                "source_type": "local",
-                "source": str(source),
-            }
-            project.save()
+            # install template
+            if not symlink:
+                # copy full template tree
+                shutil.copytree(source, project.root)
+                
+                # create meta file
+                project.setup()
+                project.meta = {
+                    "created": time.time(),
+                    "source_type": "local",
+                    "source": str(source),
+                }
+                project.save()
+            else:
+                # create a symlink
+                os.symlink(source, project.root, target_is_directory=True)
 
             self.load()
             return project

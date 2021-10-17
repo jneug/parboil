@@ -105,6 +105,8 @@ def list(TPLDIR, plain):
                         meta["created"] = "unknown"
                     else:
                         meta["created"] = time.ctime(int(project.meta["created"]))
+                    if project.is_symlinked():
+                        project.name += "*"
 
                     console.indent(
                         f'| {Fore.CYAN}{project.name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |'
@@ -131,16 +133,21 @@ def list(TPLDIR, plain):
     help="Set this flag if SOURCE is a github repository to download instead of a local directory.",
 )
 @click.option("-r", "--repo", "is_repo", is_flag=True)
+@click.option("-s", "--symlink", "symlink", is_flag=True)
 @click.argument("source")
 @click.argument("template", required=False)
 @click.pass_context
-def install(ctx, source, template, force, download, is_repo):
+def install(ctx, source, template, force, download, is_repo, symlink):
     """
     Install a project template named TEMPLATE from SOURCE to the local template repository.
 
     SOURCE may be a local directory or the url of a GitHub repository. You may also pass in
     the name of a repository in the form user/repo, but need to set the -d flag to indicate
     it isn't a local directory.
+    
+    -r indicates that SOURCE is a folder with multiple templates that should be installed. 
+    
+    Use -s to create symlinks instead of copying the files. (Useful for template development.)
     """
     # TODO: validate templates!
     TPLDIR = ctx.obj["TPLDIR"]
@@ -174,7 +181,8 @@ def install(ctx, source, template, force, download, is_repo):
             )
         else:
             projects = repo.install_from_directory(
-                template, source, hard=True, is_repo=is_repo
+                template, source, hard=True, is_repo=is_repo,
+                symlink=symlink
             )
     except ProjectError as fnfe:
         console.error(str(fnfe))

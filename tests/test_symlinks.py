@@ -11,6 +11,8 @@ from parboil.project import Project, Repository
 
 def test_symlink(repo_path, tpl_path):
     repo = Repository(repo_path)
+    
+    # Install as symlink
     proj = repo.install_from_directory(
         "symlink_test", tpl_path / "hello_world", symlink=True
     )
@@ -20,10 +22,33 @@ def test_symlink(repo_path, tpl_path):
     assert repo_path.joinpath("symlink_test").is_symlink()
     assert repo.is_installed("symlink_test")
     assert "symlink_test" in repo
+    
+    # Overwrite without symlink
+    proj = repo.install_from_directory(
+        "symlink_test", tpl_path / "hello_world", hard=True, symlink=False
+    )
+    assert proj.exists()
+    assert not proj.is_symlinked()
+    assert not repo_path.joinpath("symlink_test").is_symlink()
+    
+    # Overwrite again with symlink
+    proj = repo.install_from_directory(
+        "symlink_test", tpl_path / "hello_world", hard=True, symlink=True
+    )
+    assert proj.exists()
+    assert proj.is_symlinked()
+    assert repo_path.joinpath("symlink_test").is_symlink()
+    
+    # Delete symlink
+    repo.uninstall("symlink_test")
+    assert not proj.exists()
+    assert not repo_path.joinpath("symlink_test").exists()
+    assert not repo.is_installed("symlink_test")
 
 
 def test_boil_install_w_symlink(mocker, boil_runner, tpl_path):
     mocker.patch("parboil.project.Repository.install_from_directory")
+    # Test install with -s option
     boil_runner("install", str(tpl_path / "hello_world"), "-s")
     Repository.install_from_directory.assert_called_once_with(
         "hello_world",
@@ -31,6 +56,17 @@ def test_boil_install_w_symlink(mocker, boil_runner, tpl_path):
         hard=True,
         is_repo=False,
         symlink=True,
+    )
+    
+    # Verify install without -s option working as expected
+    boil_runner("install", str(tpl_path / "hello_world"))
+    
+    Repository.install_from_directory.assert_called_once_with(
+        "hello_world",
+        str(tpl_path / "hello_world"),
+        hard=True,
+        is_repo=False,
+        symlink=False,
     )
 
 

@@ -5,16 +5,18 @@ from parboil.parboil import boil
 from parboil.project import PRJ_FILE, META_FILE
 
 
-def test_boil_install(boil_runner):
+def test_boil_install_help(boil_runner):
+    # help message
+    result = boil_runner("install", "--help")
+    assert result.exit_code == 0
+    assert result.output.startswith("Usage: boil install [OPTIONS] SOURCE [TEMPLATE]")
+    
+
+def test_boil_install_noargs(boil_runner):
     # use without args not allowed
-    result = boil_runner.invoke(boil, ["install"])
+    result = boil_runner("install")
     assert result.exit_code == 2
     assert "Missing argument 'SOURCE'" in result.output
-
-    # help message
-    result = boil_runner.invoke(boil, ["install", "--help"])
-    assert result.exit_code == 0
-    assert "Usage: boil install [OPTIONS] SOURCE [TEMPLATE]" in result.output
 
 
 def test_boil_install_local(boil_runner, tpl_path):
@@ -91,3 +93,11 @@ def test_boil_install_github(boil_runner):
     assert install_path.is_dir()
     assert (install_path / PRJ_FILE).is_file()
     assert (install_path / META_FILE).is_file()
+    
+   
+def test_boil_install_repo_local(boil_runner, tpl_repo):
+    pass
+
+
+def test_boil_install_repo_github(boil_runner):
+    pass

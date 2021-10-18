@@ -6,11 +6,11 @@ from click.testing import CliRunner
 from parboil.parboil import boil
 
 
-def test_boil_list(boil_runner):
+def test_boil_list_help(boil_runner):
     # help message
-    result = boil_runner.invoke(boil, ["list", "--help"])
+    result = boil_runner("list", "--help")
     assert result.exit_code == 0
-    assert "Usage: boil list [OPTIONS]" in result.output
+    assert result.output.startswith("Usage: boil list [OPTIONS]")
 
 
 def test_boil_list_config(boil_runner, repo_path, tpl_path, config_file):
@@ -58,13 +58,8 @@ def test_boil_list_config(boil_runner, repo_path, tpl_path, config_file):
     assert "license" in result.output
 
 
-def test_boil_list_plain(boil_runner, tpl_path):
-    # Install necessary templates
-    result = boil_runner.invoke(boil, ["install", f"{tpl_path}/test"])
+@pytest.mark.repo_path_contents('hello_world', 'test')
+def test_boil_list_plain(boil_runner, repo_path):
+    result = boil_runner.invoke(boil, ["--tplpath", str(repo_path), "list", "-p"])
     assert result.exit_code == 0
-    result = boil_runner.invoke(boil, ["install", f"{tpl_path}/license"])
-    assert result.exit_code == 0
-
-    result = boil_runner.invoke(boil, ["list", "-p"])
-    assert result.exit_code == 0
-    assert "license\ntest\n" == result.output
+    assert "hello_world\ntest\n" == result.output

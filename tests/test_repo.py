@@ -28,5 +28,5 @@ def test_repo(repo_path):
         assert tpl in ["license", "test"]
 
     for tpl in repo.projects():
-        assert type(tpl) is Project
+        assert isinstance(tpl, Project)
         assert tpl.name in ["license", "test"]

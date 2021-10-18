@@ -146,9 +146,9 @@ def install(ctx, source, template, force, download, is_repo, symlink):
     SOURCE may be a local directory or the url of a GitHub repository. You may also pass in
     the name of a repository in the form user/repo, but need to set the -d flag to indicate
     it isn't a local directory.
-    
-    -r indicates that SOURCE is a folder with multiple templates that should be installed. 
-    
+
+    -r indicates that SOURCE is a folder with multiple templates that should be installed.
+
     Use -s to create symlinks instead of copying the files. (Useful for template development.)
     """
     # TODO: validate templates!

@@ -196,7 +196,7 @@ def install(ctx, source, template, force, download, is_repo, symlink):
             echo=ctx.fail,
         )
     else:
-        if isinstance(projects, list):
+        if isinstance(projects, type([])):
             for project in projects:
                 console.success(
                     f"Installed template {Style.BRIGHT}{project.name}{Style.RESET_ALL}"

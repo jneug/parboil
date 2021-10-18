@@ -31,10 +31,10 @@ class Project(object):
         self._name = name
         if type(repository) is Repository:
             self._repo = repository
-            self._root_dir = (repository.root / self._name).resolve()
+            self._root_dir = repository.root / self._name
         else:
             self._repo = None
-            self._root_dir = (Path(repository) / self._name).resolve()
+            self._root_dir = Path(repository) / self._name
         # Cache for jinja environment
         self._jinja = None
 
@@ -45,8 +45,7 @@ class Project(object):
     @property
     def root(self):
         return self._root_dir
-    
-    @property
+
     def is_symlinked(self):
         return self._root_dir.is_symlink()
 
@@ -57,11 +56,14 @@ class Project(object):
         return self.exists() and (self._root_dir / PRJ_FILE).is_file()
 
     def setup(self, load_project=False):
+        # Resolve root dir, may be a symlink
+        _root = self._root_dir.resolve()
+
         # setup config files and paths
-        self.project_file = self._root_dir / PRJ_FILE
-        self.meta_file = self._root_dir / META_FILE
-        self.templates_dir = self._root_dir / "template"
-        self.includes_dir = self._root_dir / "includes"
+        self.project_file = _root / PRJ_FILE
+        self.meta_file = _root / META_FILE
+        self.templates_dir = _root / "template"
+        self.includes_dir = _root / "includes"
 
         self.meta = dict()
         self.files = dict()
@@ -367,7 +369,7 @@ class Repository(object):
             if not symlink:
                 # copy full template tree
                 shutil.copytree(source, project.root)
-                
+
                 # create meta file
                 project.setup()
                 project.meta = {

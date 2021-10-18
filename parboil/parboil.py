@@ -97,20 +97,21 @@ def list(TPLDIR, plain):
                 for project in repo.projects():
                     project.setup(load_project=True)
 
-                    meta = dict()
-                    if "updated" not in project.meta:
-                        meta["updated"] = "never"
-                    else:
-                        meta["updated"] = time.ctime(int(project.meta["updated"]))
-                    if "created" not in project.meta:
-                        meta["created"] = "unknown"
-                    else:
-                        meta["created"] = time.ctime(int(project.meta["created"]))
+                    name = project.name
+                    created = "unknown"
+                    updated = "never"
                     if project.is_symlinked():
-                        project.name += "*"
+                        name = project.name + "*"
+                        created = "-"
+                        updated = "-"
+                    else:
+                        if "updated" in project.meta:
+                            updated = time.ctime(int(project.meta["updated"]))
+                        if "created" in project.meta:
+                            created = time.ctime(int(project.meta["created"]))
 
                     console.indent(
-                        f'| {Fore.CYAN}{project.name:<12}{Style.RESET_ALL} | {meta["created"]:>24} | {meta["updated"]:>24} |'
+                        f'| {Fore.CYAN}{name:<12}{Style.RESET_ALL} | {created:>24} | {updated:>24} |'
                     )
                 print()
         else:

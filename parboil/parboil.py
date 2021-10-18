@@ -31,8 +31,7 @@ from .version import __version__
 CFG_FILE = "config.json"
 
 # TODO: use click.get_app_dir to be plattform independent
-CFG_DIR = Path.home() / ".config" / "parboil"
-
+CFG_DIR = "~/.config/parboil"
 
 # TODO: Options for debug/verbosity and colors
 @click.group()
@@ -54,15 +53,17 @@ CFG_DIR = Path.home() / ".config" / "parboil"
 def boil(ctx, config, tpldir):
     ctx.ensure_object(dict)
 
+    cfg_dir = Path(CFG_DIR).expanduser()
+
     # Set default values
-    ctx.obj["TPLDIR"] = CFG_DIR / "templates"
+    ctx.obj["TPLDIR"] = cfg_dir / "templates"
 
     # Load config file
     if config:
         user_cfg = json.load(config)
         ctx.obj = {**ctx.obj, **user_cfg}
     else:
-        cfg_file = CFG_DIR / CFG_FILE
+        cfg_file = cfg_dir / CFG_FILE
         if cfg_file.exists():
             with open(cfg_file) as f:
                 cmd_cfg = json.load(f)

@@ -1,0 +1,6 @@
+[submodule "tests/templates/license"]
+	path = tests/templates/license
+	url = https://github.com/jneug/parboil-license
+[submodule "tests/templates/parboil-template"]
+	path = tests/templates/parboil-template
+	url = https://github.com/jneug/parboil-template

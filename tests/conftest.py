@@ -1,24 +1,64 @@
 # -*- coding: utf-8 -*-
 
-import shutil
 import json
+import shutil
 from pathlib import Path
-
 
 import pytest
 from click.testing import CliRunner
+
+from parboil.parboil import boil
 
 
 @pytest.fixture(autouse=True)
 def mock_home(monkeypatch, tmp_path):
     """Monkeypatch the user home folder."""
-    root_path = tmp_path.joinpath("home")
-    root_path.mkdir()
-    #config_path = root_path.joinpath(".config", "parboil")
-    #config_path.mkdirs(parents=True)
+    home_path = tmp_path.joinpath("home")
+    config_path = home_path.joinpath(".config", "parboil", "templates")
+    config_path.mkdir(parents=True)
 
-    monkeypatch.setenv("HOME", str(root_path))
-    monkeypatch.setenv("USERPROFILE", str(root_path))
+    monkeypatch.setenv("HOME", str(home_path))
+    monkeypatch.setenv("USERPROFILE", str(home_path))
+    monkeypatch.setattr(Path, "home", lambda: home_path)
+
+
+@pytest.fixture()
+def boil_runner():
+    runner = CliRunner()
+
+    def boil_run(*args, **kwargs):
+        return runner.invoke(boil, args, **kwargs)
+
+    return boil_run
+
+
+@pytest.fixture()
+def config_path(tmp_path):
+    """Get the path to the test folder"""
+    return tmp_path.joinpath("home", ".config", "parboil")
+
+
+@pytest.fixture()
+def tpl_path():
+    """Get the path to the test folder"""
+    return Path("tests/templates")
+
+
+@pytest.fixture()
+def repo_path(tmp_path):
+    """Create a temporary repository folder"""
+    repo_dir = tmp_path / "repository"
+    repo_dir.mkdir()
+    return repo_dir
+
+
+@pytest.fixture()
+def out_path(tmp_path):
+    """Create a temporary output folder"""
+    out_dir = tmp_path / "output"
+    out_dir.mkdir(exist_ok=True)
+
+    return out_dir
 
 
 @pytest.fixture()
@@ -33,39 +73,3 @@ def config_file(tmp_path, repo_path):
         )
 
     return config_file
-
-
-@pytest.fixture()
-def tpl_path(request):
-    """Get the path to the test folder"""
-    #return request.fspath / "templates"
-    return Path("tests/templates")
-
-
-@pytest.fixture()
-def repo_path(tmp_path):
-    """
-    Create a temporary repository folder
-    """
-    repo_dir = tmp_path / "repository"
-    repo_dir.mkdir()
-    return repo_dir
-
-
-@pytest.fixture()
-def out_path(tmp_path):
-    """Create a temporary repository folder"""
-    out_dir = tmp_path / "output"
-    out_dir.mkdir(exist_ok=True)
-
-    return out_dir
-
-
-@pytest.fixture()
-def boil_runner(repo_path):
-    runner = CliRunner()
-    
-    def boil_run(*args, **kwargs):
-        return runner.invoke("boil", args, **kwargs)
-    
-    return boil_run

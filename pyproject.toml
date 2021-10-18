@@ -25,6 +25,7 @@ pytest = "^6.2.5"
 isort = "^5.9.3"
 black = "^21.9b0"
 flake8 = "^4.0.1"
+pytest-mock = "^3.6.1"
 
 [tool.poetry.scripts]
 boil = "parboil.parboil:boil"

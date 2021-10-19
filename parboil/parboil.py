@@ -363,7 +363,7 @@ def use(ctx, template, out, hard, value):
             console.success(f"Created {Style.BRIGHT}{file_out}{Style.RESET_ALL}")
         else:
             console.warn(
-                f"Skipped {Style.BRIGHT}{file_in}{Style.RESET_ALL} due to empty content"
+                f"Skipped {Style.BRIGHT}{file_out}{Style.RESET_ALL} due to empty content"
             )
 
     console.success(

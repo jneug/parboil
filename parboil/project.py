@@ -222,7 +222,7 @@ class Project(object):
                         **self.variables, BOIL=boil_vars, ENV=os.environ
                     )
                 else:
-                    tpl_render = file.read_text()
+                    tpl_render = self.templates_dir.joinpath(file).read_text()
 
                 generate_file = bool(tpl_render.strip())  # empty?
                 generate_file = file_cfg.get("keep", generate_file)
@@ -237,7 +237,7 @@ class Project(object):
 
                     yield (True, str(file), path_render)
                 else:
-                    yield (False, str(file), "")
+                    yield (False, str(file), path_render)
 
     def _create_jinja(self):
         """Creates a jinja Environment for this project and caches it"""

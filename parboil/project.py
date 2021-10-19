@@ -154,7 +154,7 @@ class Project(object):
                     if hasattr(fields, field_callable):
                         # If there is a default value, compile it with jinja
                         # to replace existing jinja tags.
-                        if "default" in descr:
+                        if "default" in descr and isinstance(descr["default"], str):
                             descr["default"] = jinja.from_string(
                                 descr["default"]
                             ).render(

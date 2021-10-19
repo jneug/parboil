@@ -17,7 +17,7 @@ def test_boil_version(boil_runner):
 
 
 def test_boil_unknown(boil_runner):
-    # Unknwon command
+    # Unknown command
     result = boil_runner("unknown-command")
     assert result.exit_code == 2
     assert "Error: No such command 'unknown-command'." in result.output

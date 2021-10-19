@@ -2,6 +2,8 @@
 
 import shutil
 
+import pytest
+
 from click.testing import CliRunner
 from parboil.parboil import boil
 
@@ -60,6 +62,6 @@ def test_boil_list_config(boil_runner, repo_path, tpl_path, config_file):
 
 @pytest.mark.repo_path_contents('hello_world', 'test')
 def test_boil_list_plain(boil_runner, repo_path):
-    result = boil_runner.invoke(boil, ["--tplpath", str(repo_path), "list", "-p"])
+    result = boil_runner("--tpldir", str(repo_path), "list", "-p")
     assert result.exit_code == 0
     assert "hello_world\ntest\n" == result.output

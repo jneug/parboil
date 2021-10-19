@@ -21,19 +21,29 @@ from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.console as console
 
-from .ext import (JinjaTimeExtension, jinja_filter_fileify, jinja_filter_roman,
-                  jinja_filter_slugify, jinja_filter_time, pass_tpldir)
-from .project import (Project, ProjectError, ProjectExistsError,
-                      ProjectFileNotFoundError, Repository)
+from .ext import (
+    JinjaTimeExtension,
+    jinja_filter_fileify,
+    jinja_filter_roman,
+    jinja_filter_slugify,
+    jinja_filter_time,
+    pass_tpldir,
+)
+from .project import (
+    Project,
+    ProjectError,
+    ProjectExistsError,
+    ProjectFileNotFoundError,
+    Repository,
+)
 from .version import __version__
 
 # set global defaults
 CFG_FILE = "config.json"
 
-# TODO: use click.get_app_dir to be plattform independent
 CFG_DIR = "~/.config/parboil"
 
-# TODO: Options for debug/verbosity and colors
+
 @click.group()
 @click.version_option(version=__version__, prog_name="parboil")
 @click.option(
@@ -111,7 +121,7 @@ def list(TPLDIR, plain):
                             created = time.ctime(int(project.meta["created"]))
 
                     console.indent(
-                        f'| {Fore.CYAN}{name:<12}{Style.RESET_ALL} | {created:>24} | {updated:>24} |'
+                        f"| {Fore.CYAN}{name:<12}{Style.RESET_ALL} | {created:>24} | {updated:>24} |"
                     )
                 print()
         else:
@@ -183,8 +193,7 @@ def install(ctx, source, template, force, download, is_repo, symlink):
             )
         else:
             projects = repo.install_from_directory(
-                template, source, hard=True, is_repo=is_repo,
-                symlink=symlink
+                template, source, hard=True, is_repo=is_repo, symlink=symlink
             )
     except ProjectError as fnfe:
         console.error(str(fnfe))

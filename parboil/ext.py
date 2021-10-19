@@ -62,7 +62,7 @@ valid_filename_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
 default_replace = dict(ä="ae", ö="oe", ü="ue", ß="ss")
 
 
-def jinja_filter_fileify(s, sep="_", replace=default_replace):
+def jinja_filter_fileify(s, sep="_", replace=default_replace, char_limit=88):
     """
     Django util.text.get_valid_filename
     """

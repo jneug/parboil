@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "parboil"
-version = "0.7.8"
+version = "0.7.9"
 description = "Create reusable boilerplate templates to kickstart your next project."
 authors = ["J. Neugebauer <github@neugebauer.cc>"]
 license = "MIT"

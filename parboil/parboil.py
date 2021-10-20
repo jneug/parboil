@@ -13,6 +13,8 @@ import re
 import shutil
 import subprocess
 import time
+import logging
+import platform
 from pathlib import Path
 
 import click
@@ -20,8 +22,7 @@ from colorama import Back, Fore, Style
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.console as console
-
-from .ext import (
+from parboil.ext import (
     JinjaTimeExtension,
     jinja_filter_fileify,
     jinja_filter_roman,
@@ -29,14 +30,15 @@ from .ext import (
     jinja_filter_time,
     pass_tpldir,
 )
-from .project import (
+from parboil.logging import configure_logging
+from parboil.project import (
     Project,
     ProjectError,
     ProjectExistsError,
     ProjectFileNotFoundError,
     Repository,
 )
-from .version import __version__
+from parboil.version import __version__
 
 # set global defaults
 CFG_FILE = "config.json"
@@ -59,29 +61,48 @@ CFG_DIR = "~/.config/parboil"
     envvar="BOIL_TPLDIR",
     help="Location of the local template repository.",
 )
+@click.option("--debug", is_flag=True)
 @click.pass_context
-def boil(ctx, config, tpldir):
+def boil(ctx, config, tpldir, debug):
     ctx.ensure_object(dict)
 
-    cfg_dir = Path(CFG_DIR).expanduser()
+    # Setup logging
+    if debug:
+        configure_logging(logging.DEBUG)
+    else:
+        configure_logging(logging.WARNING)
+    logger = logging.getLogger("parboil")
+
+    logger.info(
+        "Starting up parboil, version %s (Python %s)",
+        __version__,
+        platform.python_version(),
+    )
+
 
     # Set default values
+    cfg_dir = Path(CFG_DIR).expanduser()
     ctx.obj["TPLDIR"] = cfg_dir / "templates"
 
     # Load config file
     if config:
+        logger.info("Loading config from %s ...", config)
         user_cfg = json.load(config)
         ctx.obj = {**ctx.obj, **user_cfg}
+        logger.info("    config loaded.")
     else:
         cfg_file = cfg_dir / CFG_FILE
+        logger.info("Loading user config from %s ...", str(cfg_file))
         if cfg_file.exists():
             with open(cfg_file) as f:
                 cmd_cfg = json.load(f)
                 ctx.obj = {**ctx.obj, **cmd_cfg}
+            logger.info("    config loaded.")
 
     if tpldir:
         ctx.obj["TPLDIR"] = tpldir
     ctx.obj["TPLDIR"] = Path(ctx.obj["TPLDIR"])
+    logger.info("Working with template repository %s", str(ctx.obj["TPLDIR"]))
 
 
 @boil.command(short_help="List installed templates")
@@ -91,6 +112,8 @@ def list(TPLDIR, plain):
     """
     Lists all templates in the current local repository.
     """
+    logger = logging.getLogger("parboil")
+
     repo = Repository(TPLDIR)
     if repo.exists():
         if len(repo) > 0:
@@ -309,12 +332,13 @@ def update(ctx, template):
     nargs=2,
     help="Sets a prefilled value for the template.",
 )
+@click.option("--dev", is_flag=True)
 @click.argument("template")
 @click.argument(
     "out", default=".", type=click.Path(file_okay=False, dir_okay=True, writable=True)
 )
 @click.pass_context
-def use(ctx, template, out, hard, value):
+def use(ctx, template, out, hard, value, dev):
     """
     Generate a new project from TEMPLATE.
 

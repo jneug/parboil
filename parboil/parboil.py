@@ -64,7 +64,10 @@ CFG_DIR = "~/.config/parboil"
 )
 @click.pass_context
 def boil(
-    ctx: click.Context, config: t.TextIO, tpldir: t.Union[str, Path], debug: bool
+    ctx: click.Context,
+    config: t.TextIO,
+    tpldir: t.Union[str, Path],
+    debug: bool = False,
 ) -> None:
     ctx.ensure_object(dict)
 

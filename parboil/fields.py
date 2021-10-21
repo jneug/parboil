@@ -1,15 +1,18 @@
 # -*- coding: utf-8 -*-
 
+import typing as t
+
 import click
 from colorama import Back, Fore, Style
-import typing as t
-from parboil.project import Project
 
 import parboil.console as console
 
+if t.TYPE_CHECKING:
+    from parboil.project import Project
+
 
 def field_default(
-    key: str, project: Project, default: t.Any = "", value: t.Any = None
+    key: str, project: "Project", default: t.Any = "", value: t.Any = None
 ) -> t.Any:
     if value:
         console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
@@ -37,7 +40,7 @@ def field_default(
 
 def field_choice(
     key: str,
-    project: Project,
+    project: "Project",
     default: int = 1,
     value: t.Optional[int] = None,
     choices: t.List[str] = list(),
@@ -69,7 +72,7 @@ def field_choice(
 
 def field_dict(
     key: str,
-    project: Project,
+    project: "Project",
     default: int = 1,
     value: t.Optional[t.Union[str, int]] = None,
     choices: t.Dict[str, t.Any] = dict(),
@@ -111,7 +114,7 @@ def field_dict(
 
 def field_mchoice(
     key: str,
-    project: Project,
+    project: "Project",
     default: int = 1,
     value: t.Any = None,
     choices: t.List[str] = list(),
@@ -121,7 +124,7 @@ def field_mchoice(
 
 def field_file_select(
     key: str,
-    project: Project,
+    project: "Project",
     default: int = 1,
     value: t.Optional[str] = None,
     choices: t.List[str] = list(),

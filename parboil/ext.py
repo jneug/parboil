@@ -11,7 +11,8 @@ from functools import update_wrapper
 
 from click import pass_context
 from jinja2 import nodes
-from jinja2.ext import Environment, Extension, Parser
+from jinja2.ext import Environment, Extension
+from jinja2.parser import Parser
 
 
 def pass_tpldir(f: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:

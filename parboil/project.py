@@ -28,7 +28,7 @@ META_FILE = ".parboil"
 
 
 class Project(object):
-    def __init__(self, name: str, repository: t.Union[str, Path, Repository]):
+    def __init__(self, name: str, repository: t.Union[str, Path, "Repository"]):
         self._name = name
         if isinstance(repository, Repository):
             self._repo = repository  # type: t.Optional[Repository]

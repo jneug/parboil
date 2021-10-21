@@ -15,6 +15,7 @@ import subprocess
 import time
 import logging
 import platform
+import typing as t
 from pathlib import Path
 
 import click
@@ -63,7 +64,12 @@ CFG_DIR = "~/.config/parboil"
 )
 @click.option("--debug", is_flag=True)
 @click.pass_context
-def boil(ctx, config, tpldir, debug):
+def boil(
+    ctx: click.Context,
+    config: t.TextIO,
+    tpldir: t.Union[str, Path],
+    debug: bool = False,
+) -> None:
     ctx.ensure_object(dict)
 
     # Setup logging
@@ -108,7 +114,7 @@ def boil(ctx, config, tpldir, debug):
 @boil.command(short_help="List installed templates")
 @click.option("-p", "--plain", is_flag=True)
 @pass_tpldir
-def list(TPLDIR, plain):
+def list(TPLDIR: Path, plain: bool) -> None:
     """
     Lists all templates in the current local repository.
     """
@@ -118,8 +124,8 @@ def list(TPLDIR, plain):
     if repo.exists():
         if len(repo) > 0:
             if plain:
-                for project in repo:
-                    click.echo(project)
+                for project_name in repo:
+                    click.echo(project_name)
             else:
                 console.info(
                     f"Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}."
@@ -172,7 +178,15 @@ def list(TPLDIR, plain):
 @click.argument("source")
 @click.argument("template", required=False)
 @click.pass_context
-def install(ctx, source, template, force, download, is_repo, symlink):
+def install(
+    ctx: click.Context,
+    source: str,
+    template: str,
+    force: bool,
+    download: bool,
+    is_repo: bool,
+    symlink: bool,
+) -> None:
     """
     Install a project template named TEMPLATE from SOURCE to the local template repository.
 
@@ -228,7 +242,7 @@ def install(ctx, source, template, force, download, is_repo, symlink):
             echo=ctx.fail,
         )
     else:
-        if isinstance(projects, type([])):
+        if len(projects) > 1:
             for project in projects:
                 console.success(
                     f"Installed template {Style.BRIGHT}{project.name}{Style.RESET_ALL}"
@@ -238,10 +252,10 @@ def install(ctx, source, template, force, download, is_repo, symlink):
             )
         else:
             console.success(
-                f"Installed template {Style.BRIGHT}{projects.name}{Style.RESET_ALL}"
+                f"Installed template {Style.BRIGHT}{projects[0].name}{Style.RESET_ALL}"
             )
             console.indent(
-                f"Use with {Fore.MAGENTA}boil use {projects.name}{Style.RESET_ALL}"
+                f"Use with {Fore.MAGENTA}boil use {projects[0].name}{Style.RESET_ALL}"
             )
 
 
@@ -249,7 +263,7 @@ def install(ctx, source, template, force, download, is_repo, symlink):
 @click.option("-f", "--force", is_flag=True)
 @click.argument("template")
 @pass_tpldir
-def uninstall(TPLDIR, force, template):
+def uninstall(TPLDIR: Path, force: bool, template: str) -> None:
     repo = Repository(TPLDIR)
 
     if repo.is_installed(template):
@@ -270,10 +284,10 @@ def uninstall(TPLDIR, force, template):
                 console.error(
                     f"Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}"
                 )
-                console.line(
+                console.indent(
                     "You might need to manually delete the template directory at"
                 )
-                console.line(f"{Style.BRIGHT}{repo.root}{Style.RESET_ALL}")
+                console.indent(f"{Style.BRIGHT}{repo.root}{Style.RESET_ALL}")
     else:
         console.warn(f"Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist")
 
@@ -281,7 +295,7 @@ def uninstall(TPLDIR, force, template):
 @boil.command(short_help="Update an existing template")
 @click.argument("template")
 @click.pass_context
-def update(ctx, template):
+def update(ctx: click.Context, template: str) -> None:
     """
     Update TEMPLATE from the source it was first installed from.
     """
@@ -338,7 +352,14 @@ def update(ctx, template):
     "out", default=".", type=click.Path(file_okay=False, dir_okay=True, writable=True)
 )
 @click.pass_context
-def use(ctx, template, out, hard, value, dev):
+def use(
+    ctx: click.Context,
+    template: str,
+    out: t.Union[str, Path],
+    hard: bool,
+    value: t.List[t.Tuple[str, str]],
+    dev: bool,
+) -> None:
     """
     Generate a new project from TEMPLATE.
 

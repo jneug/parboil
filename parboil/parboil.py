@@ -358,7 +358,7 @@ def use(
     out: t.Union[str, Path],
     hard: bool,
     value: t.List[t.Tuple[str, str]],
-    dev: bool,
+    dev: bool = False,
 ) -> None:
     """
     Generate a new project from TEMPLATE.

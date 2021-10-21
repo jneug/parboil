@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import tempfile
 import time
+import typing as t
 from pathlib import Path
 
 import click
@@ -27,35 +28,35 @@ META_FILE = ".parboil"
 
 
 class Project(object):
-    def __init__(self, name, repository):
+    def __init__(self, name: str, repository: t.Union[str, Path, Repository]):
         self._name = name
-        if type(repository) is Repository:
-            self._repo = repository
+        if isinstance(repository, Repository):
+            self._repo = repository  # type: t.Optional[Repository]
             self._root_dir = repository.root / self._name
         else:
             self._repo = None
             self._root_dir = Path(repository) / self._name
         # Cache for jinja environment
-        self._jinja = None
+        self._jinja = None  # type: t.Optional[Environment]
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self._name
 
     @property
-    def root(self):
+    def root(self) -> Path:
         return self._root_dir
 
-    def is_symlinked(self):
+    def is_symlinked(self) -> bool:
         return self._root_dir.is_symlink()
 
-    def exists(self):
+    def exists(self) -> bool:
         return self._root_dir.is_dir()
 
-    def is_project(self):
+    def is_project(self) -> bool:
         return self.exists() and (self._root_dir / PRJ_FILE).is_file()
 
-    def setup(self, load_project=False):
+    def setup(self, load_project: bool = False) -> None:
         # Resolve root dir, may be a symlink
         _root = self._root_dir.resolve()
 
@@ -65,31 +66,31 @@ class Project(object):
         self.templates_dir = _root / "template"
         self.includes_dir = _root / "includes"
 
-        self.meta = dict()
-        self.files = dict()
-        self.fields = dict()
-        self.variables = dict()
-        self.templates = list()
-        self.includes = list()
+        self.meta: t.Dict[str, t.Any] = dict()
+        self.files: t.Dict[str, t.Dict[str, t.Any]] = dict()
+        self.fields: t.Dict[str, t.Any] = dict()
+        self.variables: t.Dict[str, t.Any] = dict()
+        self.templates: t.List[t.Union[str, Path, Project]] = list()
+        self.includes: t.List[Path] = list()
 
         self.templates = list()
         for root, dirs, files in os.walk(self.templates_dir):
-            root = Path(root).resolve()
+            root_path = Path(root).resolve()
             for name in files:
-                dirname = root.relative_to(self.templates_dir)
+                dirname = root_path.relative_to(self.templates_dir)
                 self.templates.append(dirname / name)
 
         self.includes = list()
         for root, dirs, files in os.walk(self.includes_dir):
-            root = Path(root).resolve()
+            root_path = Path(root).resolve()
             for name in files:
-                dirname = root.relative_to(self.includes_dir)
+                dirname = root_path.relative_to(self.includes_dir)
                 self.includes.append(dirname / name)
 
         if load_project:
             self.load()
 
-    def load(self):
+    def load(self) -> None:
         """Loads the project file and some metadata"""
 
         if not self.project_file:
@@ -126,7 +127,7 @@ class Project(object):
             with open(self.meta_file) as f:
                 self.meta = {**self.meta, **json.load(f)}
 
-    def fill(self, prefilled=dict(), jinja=None):
+    def fill(self, prefilled: t.Dict[str, str] = dict(), jinja: t.Optional[Environment] = None) -> None:
         """
         Get field values either from the prefilled values or read user input.
         """
@@ -140,7 +141,7 @@ class Project(object):
                     **self.variables, BOIL=dict(TPLNAME=self._name), ENV=os.environ
                 )
 
-            if type(descr) is dict and "type" in descr:
+            if isinstance(descr, dict) and "type" in descr:
                 if descr["type"] == "project":
                     subproject = Project(descr["name"], self.root.parent)
                     if subproject.is_project():
@@ -168,7 +169,7 @@ class Project(object):
                             key=key, **descr, value=value, project=self
                         )
 
-    def compile(self, target_dir, jinja=None):
+    def compile(self, target_dir, jinja=None) -> t.Generator[t.Tuple[bool, str, str], None, None]:
         """
         Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder.
 
@@ -182,15 +183,15 @@ class Project(object):
 
         target_dir = Path(target_dir).resolve()
 
-        result = (list(), list())
-        for file in self.templates:
-            if type(file) is Project:
-                for result in file.compile(target_dir):
+        # result = (list(), list())
+        for _file in self.templates:
+            if isinstance(_file, Project):
+                for result in _file.compile(target_dir):
                     yield result
             else:
-                file_in = Path(str(file).removeprefix("includes:"))
+                file_in = Path(str(_file).removeprefix("includes:"))
                 file_out = str(file_in)
-                file_cfg = self.files.get(str(file_in), dict())
+                file_cfg: t.Dict[str, t.Any] = self.files.get(str(file_in), dict())
                 file_out = file_cfg.get("filename", file_out)
 
                 rel_path = file_in.parent
@@ -210,7 +211,7 @@ class Project(object):
                 )
 
                 if Path(path_render).exists() and not file_cfg.get("overwrite", True):
-                    yield (False, file_in, "")
+                    yield (False, str(file_in), "")
                     continue
 
                 boil_vars["FILENAME"] = Path(path_render).name
@@ -218,11 +219,11 @@ class Project(object):
 
                 if file_cfg.get("compile", True):
                     # Render template
-                    tpl_render = jinja.get_template(str(file)).render(
+                    tpl_render = jinja.get_template(str(_file)).render(
                         **self.variables, BOIL=boil_vars, ENV=os.environ
                     )
                 else:
-                    tpl_render = self.templates_dir.joinpath(file).read_text()
+                    tpl_render = self.templates_dir.joinpath(_file).read_text()
 
                 generate_file = bool(tpl_render.strip())  # empty?
                 generate_file = file_cfg.get("keep", generate_file)
@@ -235,11 +236,11 @@ class Project(object):
                     with open(path_render_abs, "w") as f:
                         f.write(tpl_render)
 
-                    yield (True, str(file), path_render)
+                    yield (True, str(_file), path_render)
                 else:
-                    yield (False, str(file), path_render)
+                    yield (False, str(_file), path_render)
 
-    def _create_jinja(self):
+    def _create_jinja(self) -> Environment:
         """Creates a jinja Environment for this project and caches it"""
         if not self._jinja:
             self._jinja = Environment(
@@ -261,13 +262,13 @@ class Project(object):
 
         return self._jinja
 
-    def save(self):
+    def save(self) -> None:
         """Saves the current meta file to disk"""
         if self.meta_file:
             with open(self.meta_file, "w") as f:
                 json.dump(self.meta, f)
 
-    def update(self, hard=False):
+    def update(self, hard: bool = False) -> None:
         """Update the template from its original source"""
         if not self.meta_file.exists():
             raise ProjectFileNotFoundError(
@@ -294,18 +295,18 @@ class Project(object):
 
 
 class Repository(object):
-    def __init__(self, root):
+    def __init__(self, root: t.Union[str, Path]) -> None:
         self._root = Path(root)
         self.load()
 
     @property
-    def root(self):
+    def root(self) -> Path:
         return self._root
 
-    def exists(self):
+    def exists(self) -> bool:
         return self._root.is_dir()
 
-    def load(self):
+    def load(self) -> None:
         self._projects = list()
         if self.exists():
             for child in self._root.iterdir():
@@ -314,25 +315,25 @@ class Repository(object):
                     if project_file.is_file():
                         self._projects.append(child.name)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self._projects)
 
-    def __iter__(self):
+    def __iter__(self) -> t.Generator[str, None, None]:
         yield from self._projects
 
-    def is_installed(self, template):
+    def is_installed(self, template: str) -> bool:
         tpl_dir = self._root / template
         return tpl_dir.is_dir()
         # return Project(template, self).exists()
 
-    def projects(self):
+    def projects(self) -> t.Generator[Project, None, None]:
         for prj in self._projects:
             yield self.get_project(prj)
 
-    def get_project(self, template):
+    def get_project(self, template: str) -> Project:
         return Project(template, self)
 
-    def install_from_directory(self, template, source, hard=False, is_repo=False, symlink=False):
+    def install_from_directory(self, template: str, source: t.Union[str, Path], hard: bool = False, is_repo: bool = False, symlink: bool = False) -> t.List[Project]:
         """If source contains a valid project template it is installed
         into this local repository and the Project object is returned.
         """
@@ -383,7 +384,7 @@ class Repository(object):
                 os.symlink(source, project.root, target_is_directory=True)
 
             self.load()
-            return project
+            return [project]
         else:
             projects = list()
 
@@ -394,7 +395,7 @@ class Repository(object):
                         try:
                             project = self.install_from_directory(
                                 child.name, child, hard=hard
-                            )
+                            )[0]
                             projects.append(project)
                         except ProjectFileNotFoundError:
                             pass
@@ -402,7 +403,7 @@ class Repository(object):
             self.load()
             return projects
 
-    def install_from_github(self, template, url, hard=False, is_repo=False):
+    def install_from_github(self, template: str, url: str, hard: bool = False, is_repo: bool = False) -> t.List[Project]:
         if not is_repo:
             # check target dir
             if self.is_installed(template):
@@ -430,7 +431,7 @@ class Repository(object):
             project.save()
 
             self.load()
-            return project
+            return [project]
         else:
             projects = list()  # return list of installed projects
 
@@ -446,7 +447,7 @@ class Repository(object):
                             try:
                                 project = self.install_from_directory(
                                     child.name, child, hard=hard
-                                )
+                                )[0]
                                 # remove source data
                                 del project.meta["source_type"]
                                 del project.meta["source"]
@@ -461,10 +462,10 @@ class Repository(object):
             self.load()
             return projects
 
-    def uninstall(self, template):
+    def uninstall(self, template: str) -> None:
         self._delete(template)
 
-    def _delete(self, template):
+    def _delete(self, template: str) -> None:
         """Delete a project template from this repository."""
         tpl_dir = self._root / template
         if tpl_dir.is_dir():
@@ -473,7 +474,7 @@ class Repository(object):
             else:
                 shutil.rmtree(tpl_dir)
 
-    def _reload(self):
+    def _reload(self) -> t.List[str]:
         diff = list()
         for child in self._root.iterdir():
             if child.is_dir():

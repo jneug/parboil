@@ -4,16 +4,17 @@ import os
 import platform
 import re
 import string
+import typing as t
 import unicodedata
 from datetime import datetime
 from functools import update_wrapper
 
 from click import pass_context
 from jinja2 import nodes
-from jinja2.ext import Extension
+from jinja2.ext import Environment, Extension, Parser
 
 
-def pass_tpldir(f):
+def pass_tpldir(f: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
     @pass_context
     def new_func(ctx, *args, **kwargs):
         if ctx.obj and "TPLDIR" in ctx.obj:
@@ -33,18 +34,18 @@ class JinjaTimeExtension(Extension):
 
     tags = {"time"}
 
-    def __init__(self, environment):
+    def __init__(self, environment: Environment) -> None:
         super(JinjaTimeExtension, self).__init__(environment)
 
         environment.extend(datetime_format="%Y-%m-%d")
 
-    def _time(self, datetime_format):
+    def _time(self, datetime_format: str) -> str:
         if datetime_format is None:
             datetime_format = self.environment.datetime_format
 
         return datetime.now().strftime(datetime_format)
 
-    def parse(self, parser):
+    def parse(self, parser: Parser) -> nodes.Output:
         lineno = next(parser.stream).lineno
 
         arg = parser.parse_expression()
@@ -62,7 +63,12 @@ valid_filename_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
 default_replace = dict(ä="ae", ö="oe", ü="ue", ß="ss")
 
 
-def jinja_filter_fileify(s, sep="_", replace=default_replace, char_limit=88):
+def jinja_filter_fileify(
+    s: t.Any,
+    sep: str = "_",
+    replace: t.Dict[str, str] = default_replace,
+    char_limit: int = 88,
+) -> str:
     """
     Django util.text.get_valid_filename
     """
@@ -85,7 +91,7 @@ def jinja_filter_fileify(s, sep="_", replace=default_replace, char_limit=88):
     return s
 
 
-def jinja_filter_slugify(value, allow_unicode=False):
+def jinja_filter_slugify(value: t.Any, allow_unicode: bool = False) -> str:
     """
     Django util.text.slugify
     """
@@ -102,15 +108,16 @@ def jinja_filter_slugify(value, allow_unicode=False):
     return re.sub(r"[-\s]+", "-", value).strip("-_")
 
 
-def jinja_filter_roman(value):
+def jinja_filter_roman(value: t.Any) -> str:
     """Convert an integer to a Roman numeral.
     https://www.oreilly.com/library/view/python-cookbook/0596001673/ch03s24.html
     """
 
-    if not isinstance(value, type(1)):
-        return value
+    # if not isinstance(value, type(1)):
+    if not isinstance(value, int):
+        return str(value)
     if not 0 < value < 4000:
-        return value
+        return str(value)
     ints = (1000, 900, 500, 400, 100, 90, 50, 40, 10, 9, 5, 4, 1)
     nums = ("M", "CM", "D", "CD", "C", "XC", "L", "XL", "X", "IX", "V", "IV", "I")
     result = []
@@ -121,6 +128,6 @@ def jinja_filter_roman(value):
     return "".join(result)
 
 
-def jinja_filter_time(value):
+def jinja_filter_time(value: t.Any) -> str:
     """Pass the value to datetime.now().strftime()"""
     return datetime.now().strftime(value)

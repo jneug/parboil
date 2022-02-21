@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import json
+import logging
 import os
 import re
 import shutil
@@ -25,6 +26,8 @@ from .ext import (
 
 PRJ_FILE = "project.json"
 META_FILE = ".parboil"
+
+logger = logging.getLogger(__name__)
 
 
 class Project(object):
@@ -127,7 +130,11 @@ class Project(object):
             with open(self.meta_file) as f:
                 self.meta = {**self.meta, **json.load(f)}
 
-    def fill(self, prefilled: t.Dict[str, str] = dict(), jinja: t.Optional[Environment] = None) -> None:
+    def fill(
+        self,
+        prefilled: t.Dict[str, str] = dict(),
+        jinja: t.Optional[Environment] = None,
+    ) -> None:
         """
         Get field values either from the prefilled values or read user input.
         """
@@ -169,7 +176,9 @@ class Project(object):
                             key=key, **descr, value=value, project=self
                         )
 
-    def compile(self, target_dir, jinja=None) -> t.Generator[t.Tuple[bool, str, str], None, None]:
+    def compile(
+        self, target_dir, jinja=None
+    ) -> t.Generator[t.Tuple[bool, str, str], None, None]:
         """
         Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder.
 
@@ -306,7 +315,8 @@ class Repository(object):
     def exists(self) -> bool:
         return self._root.is_dir()
 
-    def load(self) -> None:
+    def load(self):
+        logger.info("Loading repository from `%s`", self._root)
         self._projects = list()
         if self.exists():
             for child in self._root.iterdir():
@@ -314,6 +324,7 @@ class Repository(object):
                     project_file = child / PRJ_FILE
                     if project_file.is_file():
                         self._projects.append(child.name)
+                        logger.info("---> %s", child.name)
 
     def __len__(self) -> int:
         return len(self._projects)
@@ -333,7 +344,14 @@ class Repository(object):
     def get_project(self, template: str) -> Project:
         return Project(template, self)
 
-    def install_from_directory(self, template: str, source: t.Union[str, Path], hard: bool = False, is_repo: bool = False, symlink: bool = False) -> t.List[Project]:
+    def install_from_directory(
+        self,
+        template: str,
+        source: t.Union[str, Path],
+        hard: bool = False,
+        is_repo: bool = False,
+        symlink: bool = False,
+    ) -> t.List[Project]:
         """If source contains a valid project template it is installed
         into this local repository and the Project object is returned.
         """
@@ -403,7 +421,9 @@ class Repository(object):
             self.load()
             return projects
 
-    def install_from_github(self, template: str, url: str, hard: bool = False, is_repo: bool = False) -> t.List[Project]:
+    def install_from_github(
+        self, template: str, url: str, hard: bool = False, is_repo: bool = False
+    ) -> t.List[Project]:
         if not is_repo:
             # check target dir
             if self.is_installed(template):

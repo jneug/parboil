@@ -8,14 +8,14 @@ readme = "README.md"
 homepage = "http://github.com/jneug/parboil"
 repository = "http://github.com/jneug/parboil"
 classifiers = [
-		"Programming Language :: Python :: 3",
+	"Programming Language :: Python :: 3",
     "Operating System :: MacOS",
     "Operating System :: Unix",
     "Operating System :: POSIX"
 	]
 
 [tool.poetry.dependencies]
-python = "^3.6.2"
+python = "^3.7"
 click = "^8.0.3"
 colorama = "^0.4.4"
 Jinja2 = "^3.0.2"
@@ -27,6 +27,7 @@ black = "^21.9b0"
 flake8 = "^4.0.1"
 pytest-mock = "^3.6.1"
 mypy = "^0.910"
+tbump = "^6.7.0"
 
 [tool.poetry.scripts]
 boil = "parboil.parboil:boil"
@@ -37,3 +38,33 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.isort]
 profile = "black"
+
+[tool.tbump]
+# Uncomment this if your project is hosted on GitHub:
+github_url = "https://github.com/jneug/parboil/"
+
+[tool.tbump.version]
+current = "0.7.9"
+regex = '''
+  (?P<major>\d+)
+  \.
+  (?P<minor>\d+)
+  \.
+  (?P<patch>\d+)
+  '''
+
+[tool.tbump.git]
+message_template = "Bump to {new_version}"
+tag_template = "v{new_version}"
+
+[[tool.tbump.file]]
+src = "pyproject.toml"
+search = 'version = "{current_version}"'
+
+[[tool.tbump.file]]
+src = "parboil/version.py"
+search = '__version__ = "{current_version}"'
+
+[[tool.tbump.file]]
+src = "tests/test_boil.py"
+search = 'assert __version__ == "{current_version}"'

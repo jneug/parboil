@@ -85,30 +85,33 @@ def boil(
         platform.python_version(),
     )
 
-
     # Set default values
     cfg_dir = Path(CFG_DIR).expanduser()
     ctx.obj["TPLDIR"] = cfg_dir / "templates"
 
     # Load config file
     if config:
-        logger.info("Loading config from %s ...", config)
-        user_cfg = json.load(config)
-        ctx.obj = {**ctx.obj, **user_cfg}
-        logger.info("    config loaded.")
+        try:
+            user_cfg = json.load(config)
+            ctx.obj = {**ctx.obj, **user_cfg}
+            logger.info("Merged in config from `%s`", config)
+        except json.JSONDecodeError:
+            logger.debug("Error loading config from `%s`", config)
     else:
         cfg_file = cfg_dir / CFG_FILE
-        logger.info("Loading user config from %s ...", str(cfg_file))
         if cfg_file.exists():
             with open(cfg_file) as f:
-                cmd_cfg = json.load(f)
-                ctx.obj = {**ctx.obj, **cmd_cfg}
-            logger.info("    config loaded.")
+                try:
+                    cmd_cfg = json.load(f)
+                    ctx.obj = {**ctx.obj, **cmd_cfg}
+                    logger.info("Merged in config from `%s`", str(cfg_file))
+                except json.JSONDecodeError:
+                    logger.debug("Error loading config from `%s`", str(cfg_file))
 
     if tpldir:
         ctx.obj["TPLDIR"] = tpldir
     ctx.obj["TPLDIR"] = Path(ctx.obj["TPLDIR"])
-    logger.info("Working with template repository %s", str(ctx.obj["TPLDIR"]))
+    logger.info("Working with template repository `%s`\n", str(ctx.obj["TPLDIR"]))
 
 
 @boil.command(short_help="List installed templates")
@@ -118,8 +121,6 @@ def list(TPLDIR: Path, plain: bool) -> None:
     """
     Lists all templates in the current local repository.
     """
-    logger = logging.getLogger("parboil")
-
     repo = Repository(TPLDIR)
     if repo.exists():
         if len(repo) > 0:
@@ -198,6 +199,8 @@ def install(
 
     Use -s to create symlinks instead of copying the files. (Useful for template development.)
     """
+    logger = logging.getLogger("parboil")
+
     # TODO: validate templates!
     TPLDIR = ctx.obj["TPLDIR"]
     repo = Repository(TPLDIR)

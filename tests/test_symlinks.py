@@ -15,7 +15,7 @@ def test_symlink(repo_path, tpl_path):
     # Install as symlink
     proj = repo.install_from_directory(
         "symlink_test", tpl_path / "hello_world", symlink=True
-    )
+    )[0]
 
     assert proj.exists()
     assert proj.is_symlinked()
@@ -26,7 +26,7 @@ def test_symlink(repo_path, tpl_path):
     # Overwrite without symlink
     proj = repo.install_from_directory(
         "symlink_test", tpl_path / "hello_world", hard=True, symlink=False
-    )
+    )[0]
     assert proj.exists()
     assert not proj.is_symlinked()
     assert not repo_path.joinpath("symlink_test").is_symlink()
@@ -34,7 +34,7 @@ def test_symlink(repo_path, tpl_path):
     # Overwrite again with symlink
     proj = repo.install_from_directory(
         "symlink_test", tpl_path / "hello_world", hard=True, symlink=True
-    )
+    )[0]
     assert proj.exists()
     assert proj.is_symlinked()
     assert repo_path.joinpath("symlink_test").is_symlink()
@@ -75,9 +75,9 @@ def test_boil_list_w_symlink(monkeypatch, boil_runner, config_path, tpl_path):
     repo = Repository(config_path / "templates")
     proj = repo.install_from_directory(
         "symlink_test", str(tpl_path / "hello_world"), symlink=True
-    )
+    )[0]
 
     assert proj.exists()
 
     result = boil_runner("list")
-    assert "| symlink_test* |                        - |                        - |" in result.output
+    assert 'symlink_test*' in result.output

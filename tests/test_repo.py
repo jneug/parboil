@@ -11,7 +11,7 @@ def test_repo_install_from_directory(repo_path, tpl_path):
     repo = Repository(repo_path)
     proj = repo.install_from_directory(
         "hello_world", tpl_path / "hello_world"
-    )
+    )[0]
 
     assert proj.exists()
     assert not proj.is_symlinked()

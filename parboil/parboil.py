@@ -31,7 +31,7 @@ from parboil.ext import (
     jinja_filter_time,
     pass_tpldir,
 )
-from parboil.logging import configure_logging
+from parboil.logger import configure_logging
 from parboil.project import (
     Project,
     ProjectError,

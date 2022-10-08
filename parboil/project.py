@@ -4,21 +4,20 @@ import json
 import logging
 import os
 import re
-import sys
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import typing as t
-from pathlib import Path
 from contextlib import contextmanager
+from pathlib import Path
 
 import click
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
-import parboil.fields as fields
-from .tasks import Task
 import parboil.console as console
+import parboil.fields as fields
 
 from .ext import (
     JinjaTimeExtension,
@@ -27,6 +26,9 @@ from .ext import (
     jinja_filter_slugify,
     jinja_filter_time,
 )
+from .tasks import Task
+
+from.errors import ProjectError, ProjectExistsError, ProjectFileNotFoundError
 
 PRJ_FILE = "project.json"
 META_FILE = ".parboil"
@@ -568,15 +570,3 @@ class Repository(object):
                         self._projects.append(child.name)
         self._projects.sort()
         return diff
-
-
-class ProjectError(Exception):
-    pass
-
-
-class ProjectFileNotFoundError(FileNotFoundError):
-    pass
-
-
-class ProjectExistsError(FileExistsError):
-    pass

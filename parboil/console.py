@@ -21,7 +21,7 @@ def printd(
 
 def info(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = click.echo) -> t.Any:
     return printd(
-        msg, echo=echo, decor=f"[{Fore.BLUE}{Style.BRIGHT}i{Style.RESET_ALL}] "
+        msg, echo=echo, decor=f"[{Fore.CYAN}{Style.BRIGHT}i{Style.RESET_ALL}] "
     )
 
 
@@ -49,12 +49,13 @@ def indent(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = click.echo) ->
 
 def question(
     msg: str,
+    key: t.Optional[str] = None,
     default: t.Optional[t.Any] = None,
     echo: t.Callable[..., t.Any] = click.prompt,
     color: t.Optional[int] = Fore.BLUE,
 ) -> t.Any:
     msg = printd(msg, echo=None, decor=f"[{color}{Style.BRIGHT}?{Style.RESET_ALL}] ")
     if default:
-        return echo(msg, default=default)
+        return echo(msg + f'\n   {Fore.MAGENTA}{key}{Style.RESET_ALL}' , default=default)
     else:
-        return echo(msg)
+        return echo(msg + f'\n   {Fore.MAGENTA}{key}{Style.RESET_ALL}')

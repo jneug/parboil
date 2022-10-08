@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
+"""Version information"""
 
-"""Contains version information"""
 
 __version__ = "0.7.10"

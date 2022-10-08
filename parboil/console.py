@@ -1,4 +1,6 @@
 # -*- coding: utf-8 -*-
+"""Unified output (and input) helpers."""
+
 
 import typing as t
 
@@ -59,3 +61,7 @@ def question(
         return echo(msg + f'\n   {Fore.MAGENTA}{key}{Style.RESET_ALL}' , default=default)
     else:
         return echo(msg + f'\n   {Fore.MAGENTA}{key}{Style.RESET_ALL}')
+
+
+def clear():
+    click.clear()

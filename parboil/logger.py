@@ -1,7 +1,15 @@
+# -*- coding: utf-8 -*-
+"""Logging facilities."""
+
+
 import logging
 import sys
 import typing as t
 from pathlib import Path
+
+from colorama import Fore, Style
+
+import parboil.console as console
 
 DEV = 15
 DEV_NAME = "DEV"
@@ -49,4 +57,5 @@ def configure_logging(
         # Log to stdout with given loglevel
         stream_handler = logging.StreamHandler(stream=sys.stdout)
         stream_handler.setLevel(loglevel)
+        stream_handler.setFormatter(logging.Formatter(f"[{Style.BRIGHT}{Fore.YELLOW}%(levelname)s{Style.RESET_ALL}] {Fore.YELLOW}%(message)s{Style.RESET_ALL}"))
         logger.addHandler(stream_handler)

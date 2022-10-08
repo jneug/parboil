@@ -79,6 +79,7 @@ def boil(
         configure_logging(logging.WARNING)
     logger = logging.getLogger("parboil")
 
+    console.clear()
     logger.info(
         "Starting up parboil, version %s (Python %s)",
         __version__,

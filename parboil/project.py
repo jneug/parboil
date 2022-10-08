@@ -4,17 +4,21 @@ import json
 import logging
 import os
 import re
+import sys
 import shutil
 import subprocess
 import tempfile
 import time
 import typing as t
 from pathlib import Path
+from contextlib import contextmanager
 
 import click
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.fields as fields
+from .tasks import Task
+import parboil.console as console
 
 from .ext import (
     JinjaTimeExtension,
@@ -72,9 +76,14 @@ class Project(object):
         self.meta: t.Dict[str, t.Any] = dict()
         self.files: t.Dict[str, t.Dict[str, t.Any]] = dict()
         self.fields: t.Dict[str, t.Any] = dict()
+        self.context: t.Dict[str, t.Any] = dict()
         self.variables: t.Dict[str, t.Any] = dict()
         self.templates: t.List[t.Union[str, Path, Project]] = list()
         self.includes: t.List[Path] = list()
+        self.tasks: t.Dict[str, t.List[Task]] = {
+            "pre-run": [],
+            "post-run": []
+        }
 
         self.templates = list()
         for root, dirs, files in os.walk(self.templates_dir):
@@ -124,6 +133,18 @@ class Project(object):
                     if "type" not in v:
                         v["type"] = "dict"
                     self.fields[k] = v
+
+        if "context" in config:
+            self.context = config["context"].copy()
+
+        if 'tasks' in config:
+            for hook in self.tasks.keys():
+                if hook in config['tasks']:
+                    for task_def in config['tasks'][hook]:
+                        if isinstance(task_def, str) or isinstance(task_def, list):
+                            self.tasks[hook].append(Task(task_def))
+                        elif isinstance(task_def, dict):
+                            self.tasks[hook].append(Task(**task_def))
 
         ## metafile
         if self.meta_file.is_file():
@@ -176,6 +197,13 @@ class Project(object):
                             key=key, **descr, value=value, project=self
                         )
 
+        for key, descr in self.context.items():
+            self.variables[key] = jinja.from_string(descr).render(
+                **self.variables,
+                BOIL=dict(TPLNAME=self._name),
+                ENV=os.environ,
+            )
+
     def compile(
         self, target_dir, jinja=None
     ) -> t.Generator[t.Tuple[bool, str, str], None, None]:
@@ -190,7 +218,22 @@ class Project(object):
         if not jinja:
             jinja = self._create_jinja()
 
+        ## Create target directory
         target_dir = Path(target_dir).resolve()
+        if not target_dir.exists():
+            target_dir.match(parents=True)
+
+        ## temporary context manager to change cwd to target dir
+        @contextmanager
+        def cwd():
+            _current = Path.cwd()
+            os.chdir(target_dir)
+            yield target_dir
+            os.chdir(_current)
+
+        ## Execute pre-run tasks
+        with cwd():
+            self.execute_tasks('pre-run')
 
         # result = (list(), list())
         for _file in self.templates:
@@ -213,6 +256,7 @@ class Project(object):
                     ABSDIR=str(abs_path),
                     OUTDIR=str(target_dir),
                     OUTNAME=str(target_dir.name),
+                    RUNTIME=sys.executable
                 )
 
                 path_render = jinja.from_string(file_out).render(
@@ -248,6 +292,25 @@ class Project(object):
                     yield (True, str(_file), path_render)
                 else:
                     yield (False, str(_file), path_render)
+
+        with cwd():
+            self.execute_tasks('post-run')
+
+    def execute_tasks(self, hook: str) -> bool:
+        success = True
+        total_tasks = len(self.tasks[hook])
+        for i, task in enumerate(self.tasks[hook]):
+            task.render(self._create_jinja(), dict(
+                **self.variables,
+                BOIL=dict(
+                    TPLNAME=self._name,
+                    RUNTIME=sys.executable
+                ),
+                ENV=os.environ
+            ))
+            console.info(f'Running {hook} task {i+1} of {total_tasks}: {task.cmd_safe}')
+            success = success and task.execute()
+        return success
 
     def _create_jinja(self) -> Environment:
         """Creates a jinja Environment for this project and caches it"""

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
-import json
+import jsonc as json
+# import json
 import logging
 import os
 import re
@@ -12,23 +13,20 @@ import time
 import typing as t
 from contextlib import contextmanager
 from pathlib import Path
+from collections.abc import MutableMapping, Sequence
+from functools import cached_property
+from dataclasses import dataclass
 
 import click
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
+from rich import inspect
 
 import parboil.console as console
-import parboil.fields as fields
+from parboil.fields import get_field
 
-from .ext import (
-    JinjaTimeExtension,
-    jinja_filter_fileify,
-    jinja_filter_roman,
-    jinja_filter_slugify,
-    jinja_filter_time,
-)
+from parboil.renderer import ParboilRenderer
 from .tasks import Task
-
-from.errors import ProjectError, ProjectExistsError, ProjectFileNotFoundError
+from .fields import Field
+from .errors import ProjectError, ProjectExistsError, ProjectFileNotFoundError
 
 PRJ_FILE = "project.json"
 META_FILE = ".parboil"
@@ -37,16 +35,16 @@ logger = logging.getLogger(__name__)
 
 
 class Project(object):
+    """
+    Baseclass for handling all template related stuff.
+    """
     def __init__(self, name: str, repository: t.Union[str, Path, "Repository"]):
         self._name = name
         if isinstance(repository, Repository):
-            self._repo = repository  # type: t.Optional[Repository]
-            self._root_dir = repository.root / self._name
+            self._repo = repository
         else:
-            self._repo = None
-            self._root_dir = Path(repository) / self._name
-        # Cache for jinja environment
-        self._jinja = None  # type: t.Optional[Environment]
+            self._repo = Repository(repository)
+        self._root_dir = self._repo.root / self._name
 
     @property
     def name(self) -> str:
@@ -54,16 +52,26 @@ class Project(object):
 
     @property
     def root(self) -> Path:
-        return self._root_dir
+        if self.is_symlinked:
+            return self._root_dir.resolve()
+        else:
+            return self._root_dir
 
+    @property
     def is_symlinked(self) -> bool:
         return self._root_dir.is_symlink()
 
+    @property
     def exists(self) -> bool:
         return self._root_dir.is_dir()
 
+    @property
     def is_project(self) -> bool:
-        return self.exists() and (self._root_dir / PRJ_FILE).is_file()
+        return self.exists and (self._root_dir / PRJ_FILE).is_file()
+
+    @property
+    def repository(self) -> "Repository":
+        return self._repo
 
     def setup(self, load_project: bool = False) -> None:
         # Resolve root dir, may be a symlink
@@ -77,15 +85,12 @@ class Project(object):
 
         self.meta: t.Dict[str, t.Any] = dict()
         self.files: t.Dict[str, t.Dict[str, t.Any]] = dict()
-        self.fields: t.Dict[str, t.Any] = dict()
+        self.fields: t.List[Field] = list()
         self.context: t.Dict[str, t.Any] = dict()
         self.variables: t.Dict[str, t.Any] = dict()
         self.templates: t.List[t.Union[str, Path, Project]] = list()
         self.includes: t.List[Path] = list()
-        self.tasks: t.Dict[str, t.List[Task]] = {
-            "pre-run": [],
-            "post-run": []
-        }
+        self.tasks: t.Dict[str, t.List[Task]] = {"pre-run": [], "post-run": []}
 
         self.templates = list()
         for root, dirs, files in os.walk(self.templates_dir):
@@ -106,43 +111,54 @@ class Project(object):
 
     def load(self) -> None:
         """Loads the project file and some metadata"""
-
         if not self.project_file:
             self.setup()
 
-        ## project file
+        ## load project file
         config = dict()
         if self.project_file.exists():
             with open(self.project_file) as f:
-                config = json.load(f)
-                if "files" not in config:
-                    config["files"] = dict()
+                try:
+                    config = json.load(f)
+                    if "files" not in config:
+                        config["files"] = dict()
 
-                self.files = dict()
-                for file, data in config["files"].items():
-                    if type(data) is str:
-                        self.files[file] = dict(filename=data)
-                    else:
-                        self.files[file] = data
+                    self.files = dict()
+                    for file, data in config["files"].items():
+                        if type(data) is str:
+                            self.files[file] = dict(filename=data)
+                        else:
+                            self.files[file] = data
+                except json.decoder.JSONDecodeError:
+                    console.error(f"Error loading project config for project [keyword]{self.name}[/keyword].")
+                    raise ProjectError("Malformed project file.")
         else:
             raise ProjectFileNotFoundError("Project file not found.")
 
         if "fields" in config:
             for k, v in config["fields"].items():
-                if type(v) is not dict:
-                    self.fields[k] = dict(type="default", default=v)
-                else:
-                    if "type" not in v:
-                        v["type"] = "dict"
-                    self.fields[k] = v
+                if isinstance(v, list):
+                    v = dict(field_type="choice", choices=v)
+                elif not isinstance(v, MutableMapping):
+                    v = dict(default=v)
+
+                _field_type = "default"
+                if "field_type" in v:
+                    _field_type = v['field_type']
+                    del v['field_type']
+
+                v["name"] = k
+                v["project"] = self
+
+                self.fields.append(get_field(_field_type, v))
 
         if "context" in config:
             self.context = config["context"].copy()
 
-        if 'tasks' in config:
+        if "tasks" in config:
             for hook in self.tasks.keys():
-                if hook in config['tasks']:
-                    for task_def in config['tasks'][hook]:
+                if hook in config["tasks"]:
+                    for task_def in config["tasks"][hook]:
                         if isinstance(task_def, str) or isinstance(task_def, list):
                             self.tasks[hook].append(Task(task_def))
                         elif isinstance(task_def, dict):
@@ -153,62 +169,24 @@ class Project(object):
             with open(self.meta_file) as f:
                 self.meta = {**self.meta, **json.load(f)}
 
-    def fill(
-        self,
-        prefilled: t.Dict[str, str] = dict(),
-        jinja: t.Optional[Environment] = None,
-    ) -> None:
+    def fill(self, prefilled: t.Dict[str, str] = dict()) -> None:
         """
         Get field values either from the prefilled values or read user input.
         """
-        if not jinja:
-            jinja = self._create_jinja()
+        self.prefilled = prefilled
 
-        for key, descr in self.fields.items():
-            value = None
-            if key in prefilled:
-                value = jinja.from_string(prefilled[key]).render(
-                    **self.variables, BOIL=dict(TPLNAME=self._name), ENV=os.environ
-                )
+        for field in self.fields:
+            if field.name in prefilled:
+                field.value = self.renderer.render_string(prefilled[field.name], FIELD=field)
 
-            if isinstance(descr, dict) and "type" in descr:
-                if descr["type"] == "project":
-                    subproject = Project(descr["name"], self.root.parent)
-                    if subproject.is_project():
-                        subproject.setup(load_project=True)
-                        subproject.fill({**prefilled, **self.variables})
-                        self.templates.append(subproject)
-                else:
-                    field_callable = f'field_{descr["type"]}'
-                    del descr["type"]
-
-                    if hasattr(fields, field_callable):
-                        # If there is a default value, compile it with jinja
-                        # to replace existing jinja tags.
-                        if "default" in descr and isinstance(descr["default"], str):
-                            descr["default"] = jinja.from_string(
-                                descr["default"]
-                            ).render(
-                                **self.variables,
-                                BOIL=dict(TPLNAME=self._name),
-                                ENV=os.environ,
-                            )
-
-                        # Ask for user input
-                        self.variables[key] = getattr(fields, field_callable)(
-                            key=key, **descr, value=value, project=self
-                        )
+            self.renderer.render_obj(field, FIELD=field)
+            field.prompt()
+            self.variables[field.name] = field.value
 
         for key, descr in self.context.items():
-            self.variables[key] = jinja.from_string(descr).render(
-                **self.variables,
-                BOIL=dict(TPLNAME=self._name),
-                ENV=os.environ,
-            )
+            self.variables[key] = self.renderer.render_string(descr)
 
-    def compile(
-        self, target_dir, jinja=None
-    ) -> t.Generator[t.Tuple[bool, str, str], None, None]:
+    def compile(self, target_dir) -> t.Generator[t.Tuple[bool, str, str], None, None]:
         """
         Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder.
 
@@ -217,9 +195,6 @@ class Project(object):
             2. (str) The original file
             3. (str) The output file after compilation (if any)
         """
-        if not jinja:
-            jinja = self._create_jinja()
-
         ## Create target directory
         target_dir = Path(target_dir).resolve()
         if not target_dir.exists():
@@ -235,7 +210,7 @@ class Project(object):
 
         ## Execute pre-run tasks
         with cwd():
-            self.execute_tasks('pre-run')
+            self.execute_tasks("pre-run")
 
         # result = (list(), list())
         for _file in self.templates:
@@ -258,12 +233,10 @@ class Project(object):
                     ABSDIR=str(abs_path),
                     OUTDIR=str(target_dir),
                     OUTNAME=str(target_dir.name),
-                    RUNTIME=sys.executable
+                    RUNTIME=sys.executable,
                 )
 
-                path_render = jinja.from_string(file_out).render(
-                    **self.variables, BOIL=boil_vars, ENV=os.environ
-                )
+                path_render = self.renderer.render_string(file_out, BOIL=boil_vars)
 
                 if Path(path_render).exists() and not file_cfg.get("overwrite", True):
                     yield (False, str(file_in), "")
@@ -274,9 +247,7 @@ class Project(object):
 
                 if file_cfg.get("compile", True):
                     # Render template
-                    tpl_render = jinja.get_template(str(_file)).render(
-                        **self.variables, BOIL=boil_vars, ENV=os.environ
-                    )
+                    tpl_render = self.renderer.render_file(_file, BOIL=boil_vars)
                 else:
                     tpl_render = self.templates_dir.joinpath(_file).read_text()
 
@@ -296,45 +267,20 @@ class Project(object):
                     yield (False, str(_file), path_render)
 
         with cwd():
-            self.execute_tasks('post-run')
+            self.execute_tasks("post-run")
 
     def execute_tasks(self, hook: str) -> bool:
         success = True
         total_tasks = len(self.tasks[hook])
         for i, task in enumerate(self.tasks[hook]):
-            task.render(self._create_jinja(), dict(
-                **self.variables,
-                BOIL=dict(
-                    TPLNAME=self._name,
-                    RUNTIME=sys.executable
-                ),
-                ENV=os.environ
-            ))
-            console.info(f'Running {hook} task {i+1} of {total_tasks}: {task.cmd_safe}')
+            self.renderer.render_obj(task, TASK=task)
+            console.info(f"Running [keyword]{hook}[/] task {i+1} of {total_tasks}: [cmd]{task}[/]")
             success = success and task.execute()
         return success
 
-    def _create_jinja(self) -> Environment:
-        """Creates a jinja Environment for this project and caches it"""
-        if not self._jinja:
-            self._jinja = Environment(
-                loader=ChoiceLoader(
-                    [
-                        FileSystemLoader(self.templates_dir),
-                        PrefixLoader(
-                            {"includes": FileSystemLoader(self.includes_dir)},
-                            delimiter=":",
-                        ),
-                    ]
-                ),
-                extensions=[JinjaTimeExtension],
-            )
-            self._jinja.filters["fileify"] = jinja_filter_fileify
-            self._jinja.filters["slugify"] = jinja_filter_slugify
-            self._jinja.filters["roman"] = jinja_filter_roman
-            self._jinja.filters["time"] = jinja_filter_time
-
-        return self._jinja
+    @cached_property
+    def renderer(self) -> ParboilRenderer:
+        return ParboilRenderer(self)
 
     def save(self) -> None:
         """Saves the current meta file to disk"""

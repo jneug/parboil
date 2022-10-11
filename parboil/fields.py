@@ -1,157 +1,265 @@
 # -*- coding: utf-8 -*-
 
+import sys
 import typing as t
+from dataclasses import dataclass, field
 
 import click
+import rich
+import rich.prompt
 from colorama import Back, Fore, Style
+from rich import inspect
 
 import parboil.console as console
 
 if t.TYPE_CHECKING:
     from parboil.project import Project
 
+VTYPE = t.TypeVar("VTYPE")
 
-def field_default(
-    key: str, project: "Project", default: t.Any = "", value: t.Any = None
-) -> t.Any:
-    if value:
-        console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-        return value
-    else:
-        if type(default) == list:
-            return field_choice(key, project, value=value, choices=default)
-        elif type(default) is bool:
-            if default:
-                return not console.question(
-                    f'Do you want do disable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
-                    echo=click.confirm,
-                )
-            else:
-                return console.question(
-                    f'Do you want do enable "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
-                    echo=click.confirm,
-                )
+OptStr = t.Optional[str]
+OptVtype = t.Optional[VTYPE]
+
+
+MSG_DEFAULT = 'Enter a value for "[field]{name!s}[/field]"'
+MSG_CHOICE = 'Chose a value for "[field]{name!s}[/field]"'
+MSG_PREFILLED = 'Used prefilled value for "[field]{name!s}[/]"'
+MSG_DISABLE = 'Do you want do [italic]disable[/] "[field]{name!s}[/field]"'
+MSG_ENABLE = 'Do you want do [italic]enable[/] "[field]{name!s}[/field]"'
+
+
+def get_field(field_type: str, field_def: t.Dict[str, t.Any]) -> "Field":
+    global FIELD_TYPES
+
+    # select proper field instance if not defined in def
+    if field_type == "default":
+        if "default" in field_def:
+            _d = field_def["default"]
+            if isinstance(_d, bool):
+                field_type = "confirm"
+            elif isinstance(_d, list):
+                field_type = "choice"
+
+    # create field instance
+    return FIELD_TYPES[field_type](**field_def)
+    # if field_type == "confirm":
+    #     return ConfirmField(**field_def)
+    # elif field_type == 'choice':
+    #     return ChoiceField(**field_def)
+    # else:
+    #     return Field(**field_def)
+
+
+@dataclass(init=False)
+class Field(object):
+    name: str
+    project: "Project"
+    type: str = "default"
+    default: t.Any = None
+    _value: OptVtype = None
+    help: str = MSG_DEFAULT
+    condition: OptStr = None
+    optional: bool = False
+    args: t.Dict[str, t.Any] = field(default_factory=dict)
+    caster: t.Callable[[t.Any], t.Any] = str
+
+    def __init__(
+        self,
+        name: str,
+        project: "Project",
+        type: str = "str",
+        default: OptVtype = None,
+        value: OptVtype = None,
+        help: OptStr = None,
+        condition: OptStr = None,
+        optional: bool = False,
+        args: t.Dict[str, t.Any] = dict(),
+        caster: t.Callable[[t.Any], t.Any] = str,
+        **kwargs,
+    ):
+        self.name = name
+        self.project = project
+        self.type = type
+        self.default = default
+        self._value = value
+        if help:
+            self.help = help
+        self.condition = condition
+        self.optional = optional
+        self.args = args.copy()
+        if kwargs:
+            self.args.update(kwargs)
+        self.caster = caster
+
+    def __templates__(self) -> t.Generator[str, str, None]:
+        for key in ["help", "default", "value"]:
+            val = getattr(self, key, None)
+            if val is not None and isinstance(val, str):
+                setattr(self, key, (yield val))
+
+    @property
+    def value(self):
+        if self._value and self.caster:
+            return self.caster(self._value)
+        return self._value
+
+    @value.setter
+    def value(self, new_value: t.Any):
+        self._value = new_value
+
+    @value.deleter
+    def value(self):
+        self._value = None
+
+    def prompt(self) -> None:
+        """
+        Prompts the user for an answer and stores the result in self.value.
+
+        If the field already has a value, no prompt is shown. To force a prompt
+        call `del field.value` first.
+        """
+        if not self.value:
+            self._prompt()
         else:
-            return console.question(
-                f'Enter a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
-                default=default,
-            )
+            console.info(MSG_PREFILLED.format(name=self.name))
+
+    def _prompt(self) -> None:
+        self.value = console.question(
+            self.help.format(name=self.name),
+            key=self.name,
+            default=self.default,
+        )
 
 
-def field_choice(
-    key: str,
-    project: "Project",
-    default: int = 1,
-    value: t.Optional[int] = None,
-    choices: t.List[str] = list(),
-) -> t.Any:
-    if value and value < len(choices):
-        console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-        project.variables[f"{key}_index"] = value
-        return choices[value]
-    else:
-        if len(choices) > 1:
-            console.question(
-                f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
-                echo=click.echo,
-            )
-            for n, choice in enumerate(choices):
-                console.indent(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} -  "{choice}"')
-            n = click.prompt(
-                console.indent(f"Select from 1..{len(choices)}", echo=None),
-                default=default,
-            )
-            if n > len(choices):
-                console.warn(f"{n} is not a valid choice. Using default.")
-                n = default
+@dataclass(init=False)
+class ConfirmField(Field):
+    def __init__(self, name, **kwargs):
+        if bool(getattr(kwargs, "default", False)):
+            self.help = MSG_DISABLE
         else:
-            n = 1
-        project.variables[f"{key}_index"] = n - 1
-        return choices[n - 1]
+            self.help = MSG_ENABLE
+        super().__init__(name, **kwargs)
 
-
-def field_dict(
-    key: str,
-    project: "Project",
-    default: int = 1,
-    value: t.Optional[t.Union[str, int]] = None,
-    choices: t.Dict[str, t.Any] = dict(),
-) -> t.Any:
-    _keys: t.List[str] = list(choices.keys())
-    _keys_len = len(_keys)
-
-    if value and (value in choices or int(value) < _keys_len):
-        console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-        project.variables[f"{key}_key"] = value
-        if value in choices:
-            return choices[str(value)]
+    def _prompt(self) -> None:
+        if bool(self.default):
+            self.value = not console.confirm(
+                self.help.format(name=self.name),
+                default=True,
+            )
         else:
-            return choices[_keys[int(value)]]
-        return choices[value]
-    else:
-        if _keys_len > 1:
-            console.question(
-                f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
-                echo=click.echo,
+            self.value = console.confirm(
+                self.help.format(name=self.name),
+                default=False,
             )
-            for n, choice in enumerate(_keys):
-                console.indent(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} - "{choice}"')
-            n = click.prompt(
-                console.indent(f"Select from 1..{_keys_len}", echo=None),
-                default=default,
+
+
+@dataclass(init=False)
+class ChoiceField(Field):
+    choices: t.List[str] = field(default_factory=list)
+
+    def __init__(self, name, choices: t.List[t.Any], **kwargs):
+        self.help = MSG_CHOICE
+        self.choices = choices.copy()
+        super().__init__(name, **kwargs)
+
+    def __templates__(self) -> t.Generator[str, str, None]:
+        super().__templates__()
+        for i, choice in enumerate(self.choices):
+            self.choices[i] = (yield choice)
+
+    def _prompt(self) -> None:
+        if len(self.choices) > 1:
+            index, self.value = console.choice(
+                self.help.format(name=self.name),
+                choices=self.choices,
+                default=self.default,
             )
-            if n > _keys_len:
-                console.warn(f"{n} is not a valid choice. Using default.")
-                if default in choices:
-                    k = str(default)
-                else:
-                    k = _keys[int(default)]
+            self.project.variables[f"{self.name}_index"] = index
+        elif len(self.choices) == 1:
+            self.value = self.choices[0]
+            self.project.variables[f"{self.name}_index"] = 0
         else:
-            k = _keys[0]
-        project.variables[f"{key}_key"] = k
-        return choices[k]
+            self.value = None
 
 
-def field_mchoice(
-    key: str,
-    project: "Project",
-    default: int = 1,
-    value: t.Any = None,
-    choices: t.List[str] = list(),
-) -> t.Any:
-    return value
+@dataclass(init=False)
+class FileselectField(ChoiceField):
+    def _prompt(self) -> None:
+        super()._prompt()
+
+        if self.value:
+            self.project.templates.append(f"includes:{self.value}")
+            # optionally update file config with filename
+            if "filename" in self.args:
+                file_config = getattr(self.project.files, self.value, dict())
+                file_config.update({"filename": self.args["filename"]})
+                self.project.files[self.value] = file_config
 
 
-def field_file_select(
-    key: str,
-    project: "Project",
-    default: int = 1,
-    value: t.Optional[str] = None,
-    choices: t.List[str] = list(),
-    filename: t.Optional[str] = None,
-) -> t.Any:
-    if value and value in choices:
-        console.info(f'Used prefilled value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"')
-    else:
-        if len(choices) > 1:
-            console.question(
-                f'Chose a value for "{Fore.MAGENTA}{key}{Style.RESET_ALL}"',
-                echo=click.echo,
-            )
-            for n, choice in enumerate(choices):
-                console.indent(f'{Style.BRIGHT}{n+1}{Style.RESET_ALL} -  "{choice}"')
-            n = click.prompt(
-                console.indent(f"Select from 1..{len(choices)}", echo=None),
-                default=default,
-            )
-            if n > len(choices):
-                console.warn(f"{n} is not a valid choice. Using default.")
-                n = default
-            value = choices[n - 1]
+@dataclass(init=False)
+class ChoiceDictField(ChoiceField):
+    values: t.List[str] = field(default_factory=list)
+
+    def __init__(self, name, choices: t.Dict[t.Any, str], **kwargs):
+        self.help = MSG_CHOICE
+        self.values = list(choices.values())
+        super().__init__(name, choices=list(choices.keys()), **kwargs)
+
+    def __templates__(self) -> t.Generator[str, str, None]:
+        super().__templates__()
+        for i, val in enumerate(self.values):
+            self.values[i] = (yield val)
+
+    def _prompt(self) -> None:
+        super()._prompt()
+
+        if self.value:
+            i = self.project.variables[f"{self.name}_index"]
+            self.project.variables[f"{self.name}_key"] = self.value
+            self.value = self.values[i]
+
+
+@dataclass(init=False)
+class ProjectField(Field):
+    template: str = ''
+
+    def __init__(self, name, template: str, **kwargs):
+        self.template = template
+        super().__init__(name, **kwargs)
+
+    def __templates__(self) -> t.Generator[str, str, None]:
+        super().__templates__()
+        self.template = (yield self.template)
+
+    def _prompt(self) -> None:
+        console.info(f'Including subproject "[project]{self.template}[/]":')
+
+        # try:
+        #     subproject = Project(self.template, self.project.root.parent)
+        # except NameError:
+        #     from .project import Project
+        #     subproject = Project(self.template, self.project.repository)
+        if self.project.repository:
+            subproject = self.project.repository.get_project(self.template)
         else:
-            value = choices[0]
+            try:
+                subproject = Project(self.template, self.project.root.parent)
+            except NameError:
+                from .project import Project
+                subproject = Project(self.template, self.project.root.parent)
+        console.info(f'from [path]{subproject.root}[/]"!')
 
-    project.templates.append(f"includes:{value}")
-    if filename:
-        project.files[value] = {"filename": filename}
-    return value
+        if subproject.is_project:
+            subproject.setup(load_project=True)
+            subproject.fill({**self.project.prefilled, **self.project.variables})
+            self.project.templates.append(subproject)
+
+
+FIELD_TYPES = {
+    "default": Field,
+    "confirm": ConfirmField,
+    "choice": ChoiceField,
+    "file_select": FileselectField,
+    "dict": ChoiceDictField,
+    "project": ProjectField
+}

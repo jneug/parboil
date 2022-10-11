@@ -6,7 +6,7 @@ import pytest
 
 import parboil.parboil
 from parboil.parboil import boil
-from parboil.project import Project, Repository
+from parboil.project import Template, Repository
 
 
 def test_symlink(repo_path, tpl_path):

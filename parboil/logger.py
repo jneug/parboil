@@ -7,7 +7,7 @@ import sys
 import typing as t
 from pathlib import Path
 
-from colorama import Fore, Style
+from rich.logging import RichHandler
 
 import parboil.console as console
 
@@ -55,7 +55,14 @@ def configure_logging(
         logger.addHandler(lfile_handler)
     else:
         # Log to stdout with given loglevel
-        stream_handler = logging.StreamHandler(stream=sys.stdout)
-        stream_handler.setLevel(loglevel)
-        stream_handler.setFormatter(logging.Formatter(f"[{Style.BRIGHT}{Fore.YELLOW}%(levelname)s{Style.RESET_ALL}] {Fore.YELLOW}%(message)s{Style.RESET_ALL}"))
-        logger.addHandler(stream_handler)
+        # stream_handler = logging.StreamHandler(stream=sys.stdout)
+        # stream_handler.setLevel(loglevel)
+        # stream_handler.setFormatter(
+        #     logging.Formatter(
+        #         f"[{Style.BRIGHT}{Fore.YELLOW}%(levelname)s{Style.RESET_ALL}] {Fore.YELLOW}%(message)s{Style.RESET_ALL}"
+        #     )
+        # )
+        # logger.addHandler(stream_handler)
+        rich_handler = RichHandler()
+        rich_handler.setLevel(loglevel)
+        logger.addHandler(rich_handler)

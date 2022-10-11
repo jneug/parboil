@@ -7,7 +7,7 @@ Parboil lets you generate boilerplate projects from template files.
 Run boil --help for more info.
 """
 
-import json
+import jsonc as json
 import os
 import re
 import shutil
@@ -20,6 +20,11 @@ from pathlib import Path
 
 import click
 from colorama import Back, Fore, Style
+import rich
+from rich.panel import Panel
+from rich.table import Table
+from rich.tree import Tree
+from rich.syntax import Syntax
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 
 import parboil.console as console
@@ -79,7 +84,7 @@ def boil(
         configure_logging(logging.WARNING)
     logger = logging.getLogger("parboil")
 
-    console.clear()
+    # console.clear()
     logger.info(
         "Starting up parboil, version %s (Python %s)",
         __version__,
@@ -127,23 +132,23 @@ def list(TPLDIR: Path, plain: bool) -> None:
         if len(repo) > 0:
             if plain:
                 for project_name in repo:
-                    click.echo(project_name)
+                    console.out.print(project_name)
             else:
-                console.info(
-                    f"Listing templates in {Style.BRIGHT}{TPLDIR}{Style.RESET_ALL}."
-                )
-                print()
-                console.indent(f'⎪ {"name":^12} ⎪ {"created":^24} ⎪ {"updated":^24} ⎪')
-                console.indent(f'|{"-"*14}⎪{"-"*26}⎪{"-"*26}|')
+                table = Table(title=f"Templates installed in [path]{TPLDIR}[/path]", expand=True)
+
+                table.add_column("Name", style="keyword")
+                table.add_column("Created", style="purple")
+                table.add_column("Updated", style="purple")
+
                 for project in repo.projects():
                     project.setup(load_project=True)
 
                     name = project.name
-                    created = "unknown"
-                    updated = "never"
-                    if project.is_symlinked():
-                        name = project.name + "*"
-                        created = "-"
+                    created = "[white on red]unknown[/]"
+                    updated = "[bright_black]never[/]"
+                    if project.is_symlinked:
+                        name = f'[cyan]{project.name}*[/]'
+                        created = f'[path]{project.root!s}[/]'
                         updated = "-"
                     else:
                         if "updated" in project.meta:
@@ -151,10 +156,9 @@ def list(TPLDIR: Path, plain: bool) -> None:
                         if "created" in project.meta:
                             created = time.ctime(int(project.meta["created"]))
 
-                    console.indent(
-                        f"| {Fore.CYAN}{name:<12}{Style.RESET_ALL} | {created:>24} | {updated:>24} |"
-                    )
-                print()
+                    table.add_row(name, created, updated)
+
+                console.out.print(table)
         else:
             console.info("No templates installed yet.")
     else:
@@ -200,13 +204,13 @@ def install(
 
     Use -s to create symlinks instead of copying the files. (Useful for template development.)
     """
-    logger = logging.getLogger("parboil")
+    # logger = logging.getLogger("parboil")
 
     # TODO: validate templates!
     TPLDIR = ctx.obj["TPLDIR"]
     repo = Repository(TPLDIR)
 
-    # is github url? Than assume -d
+    # is source a github url? Then assume -d
     if re.match(r"https?://(www\.)?github\.com", source):
         download = True
     # set missing arguments
@@ -220,10 +224,8 @@ def install(
             template = Path(source).name
 
     if not is_repo and not force and repo.is_installed(template):
-        if not console.question(
-            f"Overwrite existing template named {Fore.CYAN}{template}{Style.RESET_ALL}",
-            color=Fore.YELLOW,
-            echo=click.confirm,
+        if not console.confirm(
+            f"Overwrite existing template named [project]{template}[/]?"
         ):
             ctx.abort()
 
@@ -242,24 +244,23 @@ def install(
         console.error(str(fee))
     except shutil.Error:
         console.error(
-            f"Could not install template {Fore.CYAN}{template}{Style.RESET_ALL}",
-            echo=ctx.fail,
+            f"Could not install template [project]{template}[/]"
         )
     else:
         if len(projects) > 1:
             for project in projects:
                 console.success(
-                    f"Installed template {Style.BRIGHT}{project.name}{Style.RESET_ALL}"
+                    f"Installed template [project]{project.name}[/]"
                 )
             console.indent(
-                f"Use with {Fore.MAGENTA}boil use <template_name>{Style.RESET_ALL}"
+                "Use with [cmd]boil use <template_name>[/]"
             )
         else:
             console.success(
-                f"Installed template {Style.BRIGHT}{projects[0].name}{Style.RESET_ALL}"
+                f"Installed template [project]{projects[0].name}[/]"
             )
             console.indent(
-                f"Use with {Fore.MAGENTA}boil use {projects[0].name}{Style.RESET_ALL}"
+                f"Use with [cmd]boil use {projects[0].name}[/]"
             )
 
 
@@ -273,27 +274,25 @@ def uninstall(TPLDIR: Path, force: bool, template: str) -> None:
     if repo.is_installed(template):
         rm = force
         if not force:
-            rm = console.question(
-                f"Do you really want to uninstall template {Fore.CYAN}{template}{Style.RESET_ALL}",
-                color=Fore.YELLOW,
-                echo=click.confirm,
+            rm = console.confirm(
+                f"Do you really want to uninstall template [project]{template}[/]"
             )
         if rm:
             try:
                 repo.uninstall(template)
                 console.success(
-                    f"Removed template {Style.BRIGHT}{template}{Style.RESET_ALL}"
+                    f"Removed template [project]{template}[/]"
                 )
             except OSError:
                 console.error(
-                    f"Error while uninstalling template {Fore.CYAN}{template}{Style.RESET_ALL}"
+                    f"Error while uninstalling template [project]{template}[/]"
                 )
                 console.indent(
                     "You might need to manually delete the template directory at"
                 )
-                console.indent(f"{Style.BRIGHT}{repo.root}{Style.RESET_ALL}")
+                console.indent(f"[path]{repo.root}[/]")
     else:
-        console.warn(f"Template {Fore.CYAN}{template}{Style.RESET_ALL} does not exist")
+        console.warn(f"Template [project]{template}[/] does not exist")
 
 
 @boil.command(short_help="Update an existing template")
@@ -373,7 +372,10 @@ def use(
     cfg = ctx.obj
 
     # Check teamplate and read configuration
-    project = Project(template, cfg["TPLDIR"])
+    # project = Project(template, cfg["TPLDIR"])
+    repo = Repository(cfg["TPLDIR"])
+    project = repo.get_project(template)
+
     try:
         project.setup(load_project=True)
     except FileNotFoundError:
@@ -392,10 +394,10 @@ def use(
         if hard:
             shutil.rmtree(out)
             out.mkdir(parents=True)
-            console.success(f"Cleared {Style.BRIGHT}{out}{Style.RESET_ALL}")
+            console.success(f"Cleared [path]{out}[/]")
     elif not out.exists():
         out.mkdir(parents=True)
-        console.success(f"Created {Style.BRIGHT}{out}{Style.RESET_ALL}")
+        console.success(f"Created [path]{out}[/]")
 
     # Read user input (if necessary)
     if project.fields:
@@ -409,12 +411,90 @@ def use(
 
     for success, file_in, file_out in project.compile(out):
         if success:
-            console.success(f"Created {Style.BRIGHT}{file_out}{Style.RESET_ALL}")
+            console.success(f"Created [path]{file_out}[/]")
         else:
             console.warn(
-                f"Skipped {Style.BRIGHT}{file_out}{Style.RESET_ALL} due to empty content"
+                f"Skipped [path]{file_out}[/] due to empty content"
             )
 
     console.success(
-        f'Generated project template "{Fore.CYAN}{template}{Style.RESET_ALL}" in {Style.BRIGHT}{out}{Style.RESET_ALL}'
+        f'Generated project template "[project]{template}[/]" in [path]{out}[/]'
     )
+
+
+@boil.command(short_help="Show information about an installed template")
+@click.option(
+    "--config",
+    is_flag=True,
+    help="Print the full project file.",
+)
+@click.option(
+    "--tree",
+    is_flag=True,
+    help="Print the full template tree.",
+)
+@click.argument("template")
+@click.pass_context
+def info(
+    ctx: click.Context,
+    template: str,
+    config: bool,
+    tree: bool
+) -> None:
+    cfg = ctx.obj
+
+    repo = Repository(cfg["TPLDIR"])
+    project = repo.get_project(template)
+    project.setup()
+
+    if tree:
+        _tree = Tree(project.name)
+        _walk_directory(project.root, _tree)
+        _tree_panel = Panel(_tree, title=f"Contents of {project.root}")
+        console.out.print(_tree_panel)
+    else:
+        _tree = Tree(project.name)
+        _walk_directory(project.templates_dir, _tree)
+        _tree_panel = Panel(_tree, title=f"{template}/{project.templates_dir.name}")
+        console.out.print(_tree_panel)
+
+    if config:
+        with open(project.project_file, 'rt') as cf:
+            _syntax = Syntax(cf.read(), lexer='json')
+            _syntax_panel = Panel(_syntax, title=str(project.project_file))
+            console.out.print(_syntax_panel)
+
+
+def _walk_directory(directory: Path, tree: Tree) -> None:
+    """Recursively build a Tree with directory contents."""
+    from rich.filesize import decimal
+    from rich.markup import escape
+
+    # Sort dirs first then by filename
+    paths = sorted(
+        Path(directory).iterdir(),
+        key=lambda path: (path.is_file(), path.name.lower()),
+    )
+
+
+    for path in paths:
+        # Remove hidden files
+        if path.name.startswith("."):
+            continue
+        if path.is_dir():
+            style = "dim" if path.name.startswith("__") else ""
+            branch = tree.add(
+                f"[bold magenta]:open_file_folder: [link file://{path}]{escape(path.name)}",
+                style=style,
+                guide_style=style,
+            )
+            _walk_directory(path, branch)
+        else:
+            text_filename = rich.text.Text(path.name, "green")
+            text_filename.highlight_regex(r"\..*$", "bold red")
+            text_filename.stylize(f"link file://{path}")
+            file_size = path.stat().st_size
+            text_filename.append(f" ({decimal(file_size)})", "blue")
+            icon = "🐍 " if path.suffix == ".py" else "📄 "
+            tree.add(rich.text.Text(icon) + text_filename)
+

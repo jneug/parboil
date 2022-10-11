@@ -1,0 +1,58 @@
+[tool.poetry]
+name = "{{ProjectName}}"
+version = "{{Version}}"
+description = "{{Description}}"
+authors = ["{{Author}} <{{Mail}}>"]
+license = "MIT"
+readme = "README.rst"
+homepage = "http://github.com/{{GithubName}}/{{PackageName}}"
+repository = "http://github.com/{{GithubName}}/{{PackageName}}"
+classifiers = [
+	]
+packages = [
+    { include = "{{PackageName}}", from = "src" },
+]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+[tool.poetry.dev-dependencies]
+
+[tool.poetry.scripts]
+{{ScriptName}} = "{{PackageName}}.{{PackageName}}:{{MainName}}"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
+
+[tool.tbump]
+github_url = "http://github.com/{{AuthorGithub}}/{{PackageName}}"
+
+[tool.tbump.version]
+current = "{{Version}}"
+regex = '''
+  (?P<major>\d+)
+  \.
+  (?P<minor>\d+)
+  \.
+  (?P<patch>\d+)
+  '''
+
+[tool.tbump.git]
+message_template = "Bump to {new_version}"
+tag_template = "v{new_version}"
+
+[[tool.tbump.file]]
+src = "pyproject.toml"
+search = 'version = "{current_version}"'
+
+[[tool.tbump.file]]
+src = "{{PackageName}}/version.py"
+search = '__version__ = "{current_version}"'
+
+[[tool.tbump.file]]
+src = "tests/test_{{ScriptName}}.py"
+search = 'assert __version__ == "{current_version}"'

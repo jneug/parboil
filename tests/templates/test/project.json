@@ -1,30 +1,78 @@
 {
-  "fields": {
-    "Project": "Test",
-    "Author": "Name",
-    "Filename": [
-      "file_a.py",
-      "file_b.py",
-      "file_c.py",
-      "file_d.py"
-    ],
-    "SpecialInclude": {
-      "type": "file_select",
-      "choices": [
-        "a.txt",
-        "b.txt",
-        "c.txt"
-      ],
-      "default": 1,
-      "filename": "{% time '%Y' %}/include.txt"
+    // fields
+    "fields": {
+        "Project": "Test",
+        "Author": {
+            "type": "str",
+            "default": "Name",
+            "help": "Enter your name",
+            "optional": true
+        },
+        "Mail": {
+            "type": "str",
+            "default": "{{Author|lower}}@github.com",
+            "help": "Enter your e-mail address",
+            "if": "Author"
+        },
+        "commit": {
+            "default": false,
+            "help": "Create initial commit after generating project?"
+        },
+        "Filename": [
+            "file_a.py",
+            "file_b.py",
+            "file_{{FIELD.name}}.py",
+            "file_d.py"
+        ],
+        "SpecialInclude": {
+            "field_type": "file_select",
+            "choices": [
+                "a.txt",
+                "b.txt",
+                "c.txt"
+            ],
+            "default": 1,
+            "filename": "{{ '%Y'|strftime }}/include.txt"
+        },
+        "_LICENSE": {
+            "field_type": "project",
+            "template": "license"
+        }
     },
-    "LICENSE": {
-      "type": "project",
-      "name": "license"
-    }
-  },
-  "files": {
-    "subfolder/rename_me.txt": "subfolder/{% time '%H_00' %}_{{ Project|fileify }}.txt",
-    "rename_and_move_me.txt": "{% time '%Y' %}/{% time '%Y-%d-%m' %}_{{ Filename }}.txt"
-  }
+    "files": {
+        "subfolder/rename_me.txt": "subfolder/{{ '%H_00'|strftime }}_{{ Project|fileify }}.txt",
+        "rename_and_move_me.txt": "{{ time '%Y' %}/{{ '%Y-%d-%m'|strftime }}_{{ Filename }}.txt"
+    },
+    "tasks": {
+        "pre-run": [
+            [
+                "rm",
+                "-rf",
+                "*"
+            ],
+            {
+                "cmd": "echo $TPLNAME",
+                "env": {
+                    "TPLNAME": "{{BOIL.TPLNAME}}",
+                    "PACKAGE": "{{ PackageName|upper }}-{{ Number|roman }}"
+                }
+            }
+        ],
+        "post-run": [
+            {
+                "cmd": "poetry install",
+                "quiet": true
+            },
+            [
+                "{{BOIL.runtime}}",
+                "-m",
+                "pytest"
+            ]
+        ]
+    },
+    "context": {
+        "PackageName": "{{Project|lower|replace(' ', '')}}",
+        "Number": 6
+    },
+    "settings": {}
 }

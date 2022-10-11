@@ -1,0 +1,15 @@
+fields:
+  ProjectName: Test
+  PackageName: "{{ProjectName|lower|replace(' ', '')}}"
+  MainName: cli
+  ScriptName: "{{PackageName}}"
+  Version: "0.0.1"
+  Description: "Description for {{ProjectName}}"
+  Author: ''
+  Mail: ''
+  GithubName: ''
+tasks:
+  post-run:
+  - poetry install
+  - poetry add click rich
+  - poetry add -G dev pytest isort black flake8 mypy tbump

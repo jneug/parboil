@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from parboil.project import Template, Repository
+from parboil.project import Project, Repository
 
 
 def test_repo_install_from_directory(repo_path, tpl_path):
@@ -27,6 +27,6 @@ def test_repo(repo_path):
     for tpl in repo:
         assert tpl in ["license", "test"]
 
-    for tpl in repo.projects():
-        assert isinstance(tpl, Template)
+    for tpl in repo.templates():
+        assert isinstance(tpl, Project)
         assert tpl.name in ["license", "test"]

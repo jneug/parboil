@@ -38,6 +38,7 @@ from parboil.ext import (
 )
 from parboil.logger import configure_logging
 from parboil.project import (
+    Template,
     Project,
     ProjectError,
     ProjectExistsError,
@@ -137,26 +138,25 @@ def list(TPLDIR: Path, plain: bool) -> None:
                 table = Table(title=f"Templates installed in [path]{TPLDIR}[/path]", expand=True)
 
                 table.add_column("Name", style="keyword")
-                table.add_column("Created", style="purple")
-                table.add_column("Updated", style="purple")
+                table.add_column("Created / Updated / Path")
 
-                for project in repo.projects():
-                    project.setup(load_project=True)
+                for _template in sorted(repo.templates(), key=lambda t: t.name):
+                    _template.load()
 
-                    name = project.name
+                    name = _template.name
                     created = "[white on red]unknown[/]"
                     updated = "[bright_black]never[/]"
-                    if project.is_symlinked:
-                        name = f'[cyan]{project.name}*[/]'
-                        created = f'[path]{project.root!s}[/]'
-                        updated = "-"
+                    if _template.is_symlinked():
+                        name = f'[cyan]{_template.name}*[/]'
+                        data = f"[path]{_template.root}[/]"
                     else:
-                        if "updated" in project.meta:
-                            updated = time.ctime(int(project.meta["updated"]))
-                        if "created" in project.meta:
-                            created = time.ctime(int(project.meta["created"]))
+                        if "updated" in _template.meta:
+                            updated = time.ctime(int(_template.meta["updated"]))
+                        if "created" in _template.meta:
+                            created = time.ctime(int(_template.meta["created"]))
+                        data = f"[purple]{created}[/] / [purple]{updated}[/]"
 
-                    table.add_row(name, created, updated)
+                    table.add_row(name, data)
 
                 console.out.print(table)
         else:
@@ -247,20 +247,21 @@ def install(
             f"Could not install template [project]{template}[/]"
         )
     else:
-        if len(projects) > 1:
-            for project in projects:
-                console.success(
-                    f"Installed template [project]{project.name}[/]"
-                )
-            console.indent(
-                "Use with [cmd]boil use <template_name>[/]"
+        if not projects:
+            console.success("No templates where installed.")
+            return
+
+        for project in projects:
+            console.success(
+                f"Installed template [project]{project.name}[/]"
+            )
+        if len(projects) == 1:
+            console.printd(
+                f"\nUse with [cmd]boil use {projects[0].name}[/]"
             )
         else:
-            console.success(
-                f"Installed template [project]{projects[0].name}[/]"
-            )
-            console.indent(
-                f"Use with [cmd]boil use {projects[0].name}[/]"
+            console.printd(
+                "\nUse with [cmd]boil use <template_name>[/]"
             )
 
 
@@ -312,10 +313,9 @@ def update(ctx: click.Context, template: str) -> None:
         )
         ctx.exit(2)
 
-    project = repo.get_project(template)
-    project.setup(load_project=True)
+    _template = repo.get_template(template, load=True)
     try:
-        project.update()
+        _template.update()
     except ProjectFileNotFoundError as pe:
         console.error(str(pe))
         console.indent(
@@ -326,7 +326,7 @@ def update(ctx: click.Context, template: str) -> None:
         console.error(str(pe))
         ctx.abort()
     else:
-        if project.meta["source_type"] == "github":
+        if _template.meta["source_type"] == "github":
             console.success(
                 f"Updated template {Fore.CYAN}{template}{Style.RESET_ALL} from GitHub."
             )
@@ -374,13 +374,13 @@ def use(
     # Check teamplate and read configuration
     # project = Project(template, cfg["TPLDIR"])
     repo = Repository(cfg["TPLDIR"])
-    project = repo.get_project(template)
+    _template = repo.get_template(template)
 
     try:
-        project.setup(load_project=True)
+        _template.load()
     except FileNotFoundError:
         console.warn(
-            f"No valid template found for key {Fore.CYAN}{template}{Style.RESET_ALL}"
+            f"No valid template found for key {Fore.CYAN}{_template}{Style.RESET_ALL}"
         )
         ctx.exit(1)
 
@@ -399,17 +399,11 @@ def use(
         out.mkdir(parents=True)
         console.success(f"Created [path]{out}[/]")
 
-    # Read user input (if necessary)
-    if project.fields:
-        # Prepare dict for prefilled values
-        prefilled = cfg["prefilled"] if "prefilled" in cfg else dict()
-        if value:
-            for k, v in value:
-                prefilled[k] = v
+    ## Prepare project and read user answers
+    project = Project(_template, out, cfg["prefilled"] if "prefilled" in cfg else dict())
+    project.fill()
 
-        project.fill(prefilled)
-
-    for success, file_in, file_out in project.compile(out):
+    for success, file_in, file_out in project.compile():
         if success:
             console.success(f"Created [path]{file_out}[/]")
         else:
@@ -418,7 +412,7 @@ def use(
             )
 
     console.success(
-        f'Generated project template "[project]{template}[/]" in [path]{out}[/]'
+        f'Generated project template "[project]{_template.name}[/]" in [path]{out}[/]'
     )
 
 
@@ -444,24 +438,23 @@ def info(
     cfg = ctx.obj
 
     repo = Repository(cfg["TPLDIR"])
-    project = repo.get_project(template)
-    project.setup()
+    _template = repo.get_template(template)
 
     if tree:
-        _tree = Tree(project.name)
-        _walk_directory(project.root, _tree)
-        _tree_panel = Panel(_tree, title=f"Contents of {project.root}")
+        _tree = Tree(_template.name)
+        _walk_directory(_template.root, _tree)
+        _tree_panel = Panel(_tree, title=f"Contents of {_template.root}")
         console.out.print(_tree_panel)
     else:
-        _tree = Tree(project.name)
-        _walk_directory(project.templates_dir, _tree)
-        _tree_panel = Panel(_tree, title=f"{template}/{project.templates_dir.name}")
+        _tree = Tree(_template.name)
+        _walk_directory(_template.templates_dir, _tree)
+        _tree_panel = Panel(_tree, title=f"{template}/{_template.templates_dir.name}")
         console.out.print(_tree_panel)
 
     if config:
-        with open(project.project_file, 'rt') as cf:
+        with open(_template.project_file, 'rt') as cf:
             _syntax = Syntax(cf.read(), lexer='json')
-            _syntax_panel = Panel(_syntax, title=str(project.project_file))
+            _syntax_panel = Panel(_syntax, title=str(_template.project_file))
             console.out.print(_syntax_panel)
 
 
@@ -475,7 +468,6 @@ def _walk_directory(directory: Path, tree: Tree) -> None:
         Path(directory).iterdir(),
         key=lambda path: (path.is_file(), path.name.lower()),
     )
-
 
     for path in paths:
         # Remove hidden files
@@ -497,4 +489,3 @@ def _walk_directory(directory: Path, tree: Tree) -> None:
             text_filename.append(f" ({decimal(file_size)})", "blue")
             icon = "🐍 " if path.suffix == ".py" else "📄 "
             tree.add(rich.text.Text(icon) + text_filename)
-

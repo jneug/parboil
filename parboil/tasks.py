@@ -20,6 +20,8 @@ class Task(MutableSequence):
     env: t.Optional[dict] = None
     quiet: bool = False
 
+    returncode: int = field(init=False, default=-1)
+
     _shell: bool = field(default=False, init=False)
 
     def __post_init__(self):
@@ -75,6 +77,7 @@ class Task(MutableSequence):
             stdout=subprocess.DEVNULL if self.quiet else None,
             stderr=subprocess.STDOUT,
         )
+        self.returncode = result.returncode
         return result.returncode == 0
 
     def quoted(self):

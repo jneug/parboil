@@ -4,13 +4,13 @@ from pathlib import Path
 
 import pytest
 
-from parboil.project import Project, ProjectFileNotFoundError
+from parboil.project import Template, ProjectFileNotFoundError
 
 
 def test_project_files(tpl_path):
 
 
-    prj = Project("test", tpl_path)
+    prj = Template("test", tpl_path)
     prj.setup()
 
     for file in ["rename_and_move_me.txt", "subfolder/rename_me.txt"]:
@@ -29,7 +29,7 @@ def test_project_files(tpl_path):
 
 
 def test_project_errors(repo_path):
-    prj = Project("_MISSING_", repo_path)
+    prj = Template("_MISSING_", repo_path)
     prj.setup()
 
     assert not prj.templates

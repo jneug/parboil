@@ -35,7 +35,7 @@
             "filename": "{{ '%Y'|strftime }}/include.txt"
         },
         "_LICENSE": {
-            "field_type": "project",
+            "field_type": "template",
             "template": "license"
         }
     },

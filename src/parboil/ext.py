@@ -26,48 +26,13 @@ def pass_tpldir(f: t.Callable[..., t.Any]) -> t.Callable[..., t.Any]:
     return update_wrapper(new_func, f)
 
 
-class JinjaTimeExtension(Extension):
-    """
-    Adds a {% time %} tag to jinja2
-
-    The argument gets passed to time.strftime.
-    """
-
-    tags = {"time"}
-
-    def __init__(self, environment: Environment) -> None:
-        super(JinjaTimeExtension, self).__init__(environment)
-
-        environment.extend(datetime_format="%Y-%m-%d")
-
-    def _time(self, datetime_format: str) -> str:
-        if datetime_format is None:
-            datetime_format = self.environment.datetime_format
-
-        return datetime.now().strftime(datetime_format)
-
-    def parse(self, parser: Parser) -> nodes.Output:
-        lineno = next(parser.stream).lineno
-
-        arg = parser.parse_expression()
-
-        call_method = self.call_method(
-            "_time",
-            [arg],
-            lineno=lineno,
-        )
-
-        return nodes.Output([call_method], lineno=lineno)
-
-
-valid_filename_chars = "-_.() %s%s" % (string.ascii_letters, string.digits)
-default_replace = dict(ä="ae", ö="oe", ü="ue", ß="ss")
+DEFAULT_REPLACE = dict(ä="ae", ö="oe", ü="ue", ß="ss")
 
 
 def jinja_filter_fileify(
     s: t.Any,
     sep: str = "_",
-    replace: t.Dict[str, str] = default_replace,
+    replace: t.Dict[str, str] = DEFAULT_REPLACE,
     char_limit: int = 88,
 ) -> str:
     """
@@ -127,8 +92,3 @@ def jinja_filter_roman(value: t.Any) -> str:
         result.append(nums[i] * count)
         value -= ints[i] * count
     return "".join(result)
-
-
-def jinja_filter_time(value: t.Any) -> str:
-    """Pass the value to datetime.now().strftime()"""
-    return datetime.now().strftime(value)

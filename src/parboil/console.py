@@ -1,102 +1,96 @@
-# -*- coding: utf-8 -*-
 """Unified output (and input) helpers."""
 
 
+import textwrap
 import typing as t
+from functools import partial
 
 import click
 import rich
+from rich.console import Console
 from rich.prompt import (
+    Confirm,
+    DefaultType,
+    FloatPrompt,
+    IntPrompt,
     Prompt,
     PromptBase,
-    IntPrompt,
-    FloatPrompt,
-    Confirm,
     PromptType,
-    DefaultType,
 )
-from rich.console import Console
 from rich.style import Style
 from rich.theme import Theme
 
-
 THEME = Theme(
     {
+        # Decorations
         "info.label": "bright_cyan bold",
         "info": "default",
         "error.label": "bright_red bold",
         "error": "red",
+        "warn.label": "orange_red1 bold",
+        "warn": "orange3",
         "success.label": "bright_green bold",
         "success": "default",
-        "question.label": "bright_blue bold",
+        "question.label": "yellow bold",
         "question": "default",
-        "project": "bright_magenta",
-        "field": "indian_red bold",
+        # Custom highlight
+        "recipe": "bright_magenta",
+        "ingredient": "indian_red bold",
         "path": "cyan italic",
         "keyword": "magenta bold",
         "input": "dark_orange",
         "cmd": "indian_red1 italic",
+        # Change some default
         "prompt.default": "indian_red",
+        "repr.path": "cyan italic",
+        "repr.filename": "bright_cyan italic",
     }
 )
-
+DECORATIONS = {
+    "error": "X",
+    "info": "i",
+    "question": "?",
+    "success": "✓",
+    "warn": "!",
+}
 
 out = Console(theme=THEME)
 
 
-def style(msg: str, highlight: str) -> str:
-    return f"[{highlight}]{msg}[/{highlight}]"
+def decoration(decor: str) -> str:
+    """Creates a decoration for a message shown to the user."""
+    return f"\[[{decor}.label]{DECORATIONS[decor]}[/{decor}.label]]"
 
 
-def style_decoration(decor_type: str) -> str:
-    return style(f"{decor_type.upper():>10}", f"{decor_type}.label")
+def clear():
+    """Clear the terminal."""
+    out.clear()
 
 
-def decoration(text: str, decor: str) -> str:
-    return f"[white bold]\[[{decor}.label]i[/{decor}.label]][/]"
+def sep():
+    """Draw a separator with the full width of the terminal."""
+    out.print("┄" * out.size.width, style="gray66")
 
 
 def printd(
-    msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print, decor: str = ""
-) -> t.Any:
-    """Print msg
-
-    Prefix with decor if given and passed to echo or returned if echo==None
-    """
-    fmsg = f"{decor}  {msg}"
-    if callable(echo):
-        return echo(fmsg)
+    msg: t.Union[str, t.List[str]], decor: str = "info", indent: int = 4
+) -> None:
+    if isinstance(msg, str):
+        msg = msg.split("\n")
     else:
-        return fmsg
+        msg = msg.copy()
+
+    tab = " " * max(0, indent)
+
+    out.print(f"{decoration(decor)} {msg[0]}")
+    for line in msg[1:]:
+        out.print(f"{tab}{line}")
 
 
-def message(
-    decor_type: str, msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print
-) -> t.Any:
-    return printd(style(msg, decor_type), echo=echo, decor=style_decoration(decor_type))
-
-
-def info(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print) -> t.Any:
-    msg = f"\[[info.label]i[/]] [info]{msg}[/]"
-    out.print(msg)
-
-
-def warn(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print) -> t.Any:
-    return printd(msg, echo=echo, decor="\[[warn.label]![/warn.label]]")
-
-
-def error(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print) -> t.Any:
-    msg = f"\[[error.label]X[/]] [error]{msg}[/]"
-    out.print(msg)
-
-
-def success(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print) -> t.Any:
-    msg = f"\[[success.label]:heavy_check_mark:[/]] [success]{msg}[/]"
-    out.print(msg)
-
-
-def indent(msg: str, echo: t.Optional[t.Callable[[str], t.Any]] = out.print) -> t.Any:
-    return printd(msg, echo=echo, decor="    ")
+info = partial(printd, decor="info")
+warn = partial(printd, decor="warn")
+error = partial(printd, decor="error")
+success = partial(printd, decor="success")
 
 
 def prompt(
@@ -110,7 +104,7 @@ def prompt(
         msg = msg.split("\n")
     else:
         msg = msg.copy()
-    msg[0] = f"\[[question.label]?[/]] [question]{msg[0]}[/]"
+    msg[0] = f"{decoration('question')} [question]{msg[0]}[/]"
     msg[1:] = map(lambda _msg: f"    [question]{_msg}[/]", msg[1:])
     for _msg in msg[:-1]:
         out.print(_msg)
@@ -175,11 +169,3 @@ def choice(
             )
         else:
             return answer, choices[answer - 1]
-
-
-def clear():
-    out.clear()
-
-
-def sep():
-    out.print("=" * out.size.width, style="gray66")

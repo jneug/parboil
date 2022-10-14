@@ -13,6 +13,9 @@ classifiers = [
     "Operating System :: Unix",
     "Operating System :: POSIX"
 	]
+packages = [
+    { include = "parboil", from = "src" },
+]
 
 [tool.poetry.dependencies]
 python = "^3.7"
@@ -25,7 +28,7 @@ rich = "^12.6.0"
 [tool.poetry.group.dev.dependencies]
 pytest = "^6.2.5"
 isort = "^5.9.3"
-black = "^21.9b0"
+black = "^22.3"
 flake8 = "^4.0.1"
 pytest-mock = "^3.6.1"
 mypy = "^0.910"
@@ -64,7 +67,7 @@ src = "pyproject.toml"
 search = 'version = "{current_version}"'
 
 [[tool.tbump.file]]
-src = "parboil/version.py"
+src = "src/parboil/__init__.py"
 search = '__version__ = "{current_version}"'
 
 [[tool.tbump.file]]

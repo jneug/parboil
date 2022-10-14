@@ -10,30 +10,34 @@ import sys
 import typing as t
 from collections.abc import MutableSequence
 from dataclasses import dataclass
-from pathlib import Path
 from functools import cached_property
+from pathlib import Path
 
 import jinja2_ansible_filters
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader, Template as JinjaTemplate
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
+from jinja2 import Template as JinjaTemplate
 from jinja2.sandbox import SandboxedEnvironment
 from rich import inspect
 
 from .ext import jinja_filter_fileify, jinja_filter_roman, jinja_filter_slugify
 
 if t.TYPE_CHECKING:
-    from parboil.project import Project
+    from parboil.recipe import Boiler
 
 
 class ParboilRenderable(t.Protocol):
     """Protocol for classes that can be rendered by ParboilRenderer.render_obj()"""
+
     def __templates__(self) -> t.Generator[str, str, None]:
         ...
 
 
 def renderable(cls=None, *attrs, strict: bool = True, render_empty: bool = False):
-    """Decorator to make a class a ParboilREnderable."""
+    """Decorator to make a class a ParboilRenderable."""
+
     def wrapper(cls):
-        if not hasattr(cls, '__templates__'):
+        if not hasattr(cls, "__templates__"):
+
             def _render(self) -> t.Generator[str, str, None]:
                 for key in attrs:
                     if hasattr(self, key):
@@ -45,7 +49,8 @@ def renderable(cls=None, *attrs, strict: bool = True, render_empty: bool = False
                     elif render_empty:
                         # set attr directly to empty string?
                         setattr(self, key, (yield ""))
-            setattr(cls, '__templates__', _render)
+
+            setattr(cls, "__templates__", _render)
         return cls
 
     if cls is None:
@@ -55,8 +60,8 @@ def renderable(cls=None, *attrs, strict: bool = True, render_empty: bool = False
 
 # TODO Exception handling
 class ParboilRenderer:
-    def __init__(self, project: "Project"):
-        self._project = project
+    def __init__(self, boiler: "Boiler"):
+        self._boiler = boiler
         self._environ = os.environ.copy()
 
     @cached_property
@@ -65,9 +70,13 @@ class ParboilRenderer:
         env = SandboxedEnvironment(
             loader=ChoiceLoader(
                 [
-                    FileSystemLoader(self._project.template.templates_dir),
+                    FileSystemLoader(self._boiler.recipe.templates_dir),
                     PrefixLoader(
-                        {"includes": FileSystemLoader(self._project.template.includes_dir)},
+                        {
+                            "includes": FileSystemLoader(
+                                self._boiler.recipe.includes_dir
+                            )
+                        },
                         delimiter=":",
                     ),
                 ]
@@ -83,17 +92,23 @@ class ParboilRenderer:
     def _render_template(self, template: JinjaTemplate, **kwargs) -> str:
         if "BOIL" not in kwargs:
             kwargs["BOIL"] = dict()
-        kwargs["BOIL"]["TPLNAME"] = self._project.template.name
+        kwargs["BOIL"]["TPLNAME"] = self._boiler.recipe.name
         kwargs["BOIL"]["RUNTIME"] = sys.executable
 
         return template.render(
-            **self._project.context, **kwargs, ENV=self._environ, PROJECT=self._project, TEMPLATE=self._project.template
+            **self._boiler.context,
+            **kwargs,
+            ENV=self._environ,
+            BOILER=self._boiler,
+            RECIPE=self._boiler.recipe
         )
 
     def render_string(self, template: str, **kwargs) -> str:
         return self._render_template(self.env.from_string(str(template)), **kwargs)
 
-    def render_strings(self, templates: t.MutableSequence[str], **kwargs) -> t.MutableSequence[str]:
+    def render_strings(
+        self, templates: t.MutableSequence[str], **kwargs
+    ) -> t.MutableSequence[str]:
         """Render a sequence of string templates in place."""
         for i, tpl in enumerate(templates):
             templates[i] = self.render_string(tpl, **kwargs)

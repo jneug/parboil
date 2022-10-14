@@ -1,10 +1,11 @@
-# -*- coding: utf-8 -*-
 """Collection of common errors."""
-
-from .tasks import Task
 
 
 class ParboilError(Exception):
+    pass
+
+
+class RecipeError(ParboilError):
     pass
 
 
@@ -26,10 +27,23 @@ class ProjectConfigError(ProjectError):
     pass
 
 
-class TaskExecutionError(ParboilError):
-    task: Task
+class RepositoryError(ParboilError):
+    def __init__(self, msg, repository):
+        self.repository = repository
 
-    def __init__(self, task: Task, msg: str = None):
+
+class RecipeNotInstalledError(RepositoryError):
+    def __init__(self, template, repository):
+        self.repository = repository
+        super().__init__(f"Project {template} not installed.")
+
+
+class BoilerError(ParboilError):
+    pass
+
+
+class TaskExecutionError(ParboilError):
+    def __init__(self, task, msg: str = None):
         self.task = task
 
         if not msg:
@@ -38,9 +52,7 @@ class TaskExecutionError(ParboilError):
 
 
 class TaskFailedError(ParboilError):
-    task: Task
-
-    def __init__(self, task: Task, msg: str = None):
+    def __init__(self, task, msg: str = None):
         self.task = task
 
         if not msg:

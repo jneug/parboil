@@ -1,0 +1,10 @@
+{
+    "Name": "String",
+    "Toggle": false,
+    "Number": 4,
+    "Choice": [
+        "Item 1",
+        "Item 2",
+        "Item 3"
+    ]
+}

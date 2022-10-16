@@ -1,0 +1,22 @@
+Name = "String"
+Toggle = false
+
+[Number]
+default = 4
+help = "Type in a number"
+
+[Choice]
+default = "Item 1"
+choices = [
+	"Item 1",
+	"Item 2",
+	"Item 3"
+]
+
+[_files]
+"output.json" = "{{Name}}.json"
+
+[_tasks.post-run]
+post-run = [
+	["bat", "{{Name}}.json"]
+]

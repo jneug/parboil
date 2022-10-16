@@ -1,14 +1,14 @@
-<h1 align=center>
-:rice:
-<br>
-Parboil
-</h1>
-<p align=center><strong>Project Boilerplate Generator</strong></p>
+# :rice: Parboil
+
+**Project Boilerplate Generator**
 
 ![GitHub](https://img.shields.io/github/license/jneug/parboil)
 
 With _Parboil_ you can create reusable boilerplate templates to kickstart your next project.
-<small>_Parboil_ is a Python rewrite of [boilr](https://github.com/tmrts/boilr) by [Tamer Tas](https://github.com/tmrts)</small>
+
+!!! note ""
+
+	_Parboil_ is a Python rewrite of [boilr](https://github.com/tmrts/boilr) by [Tamer Tas](https://github.com/tmrts)
 
 ----
 
@@ -24,7 +24,7 @@ _Parboil_ will install a `boil` command on your system. Run `boil --version` to 
 
 ## Getting started
 
-Use `boil --help` to see the list of available commands and `boil <command> --help` to see usage information for any command.
+Use `boil --help` to see the list of [available commands](overview.md) and `boil <command> --help` to see usage information for any command.
 
 ### Installing your first template
 
@@ -54,41 +54,47 @@ This will create the boilerplate project in the `new_template` directory. (Omitt
 
 To remove a template run `boil uninstall <templatename>` and to update from its original source (either a local directory or a GitHub repository) run `boil update <templatename>`. 
 
-### Creating your first template
+### Creating your first recipe
 
-The parboil-template is a good startign point to create your own template. _Parboil_ uses [Jinja2](https://jinja.palletsprojects.com) to parse the template files and dynamically insert the user information into the template files. That means, you can use all of Jinjas features (and some more), to create your template files. 
+The `parboil-template` is a good starting point to create your own template. _Parboil_ uses [Jinja2](https://jinja.palletsprojects.com) to parse the template files and dynamically insert the user information into the template files. That means, you can use all of Jinjas features (and some more), to create your template files. 
 
 Let's create a simple project template for meeting logs from scratch.
 
 First, create a directory for your new template. Let's call it `meeting_log`. Then creat a directory called `template` and a file called `project.json` in it.
 
 ```
-meeting_log
-	template
-	project.json
+meeting_log/
+├── template/
+└── parboil.json
 ```
 
-This is the basic structure of a project template. `project.json` holds the template configuration and `template` the actual template files.
+This is the basic structure of a parboil recipe. `parboil.json` holds the recipe configuration and `template` the actual template files.
 
-Now open `project.json` in any editor and copy the following text into it:
+Now open `parboil.json` in any editor and copy the following text into it:
 
-```
-{
-	"fields": {
+!!! example
+
+	``` json
+	{
+		// Ingredients for the meeting log recipe
 		"Author": "",
 		"Meeting": "Daily meeting",
 		"MeetingNo": 1,
 		"Topic": "Planning the day",
-		"IamModerator": false
+		"IamModerator": false,
+		"NumberOfTops": 2
 	}
-}
-```
+	```
 
-The `fields` key is used to define custom inputs, that the user needs to enter whenever the template is used. The key of each entry is the field name, the value is the default. An empty string means, the key is required everytime.
+This is a basic recipe that defines five [ingredients](recipes/ingredients.md). Ingredients are essentially variables that are filled in by the user and inserted into the template files. The key of each entry is the field name, the value is the default. An empty string means, the key is required everytime.
+
+!!! tip
+
+	As you can see in the example above, a recipe is defined in json with comments format. 
 
 Now we need to add the file(s) that should be created by Parboil. Create `{{Meeting}}_log.md` in the `template` directory. And enter this text:
 
-```
+``` jinja
 # Meeting notes for {{ Meeting|title }} #{{ MeetingNo }} 
 
 > Date: {% time '%Y-%m-%d' %}
@@ -98,19 +104,20 @@ Now we need to add the file(s) that should be created by Parboil. Create `{{Meet
 
 ## Topics
 
-1. 
-2. 
+{% for t in range(NumberOfTops) %}
+{{t|format('{:<2}')}}. 
+{% endfor %}
 
 ## Notes
 
 
 ```
 
-The template uses [Jinjas syntax](https://jinja.palletsprojects.com/en/2.11.x/templates/) to add the field values. For example `{{ Author }}` will be replaced with the name you entered while prompted. Note that you can use the fields in filenames, too.
+The template uses [Jinjas syntax](https://jinja.palletsprojects.com/en/3.10.x/templates/) to add the field values. For example `{{ Author }}` will be replaced with the name you entered while prompted. Note that you can use the fields in filenames, too.
 
 You can use any Jinja [macros](https://jinja.palletsprojects.com/en/2.11.x/templates/#list-of-control-structures) and [filters](https://jinja.palletsprojects.com/en/2.11.x/templates/#list-of-builtin-filters) in your templates. `{{ Meeting|title }}` will tranform the value of "Meeting" into titlecase. `{% if IamModerator %}` is a conditional. 
 
-For more information read [the wiki page on template creation](https://github.com/jneug/parboil/wiki/How-to-create-templates).
+For more information read [the wiki page on template creation](recipes/howto.md).
 
 ### Some more template creation
 

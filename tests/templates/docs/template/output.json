@@ -1,0 +1,14 @@
+{
+    "ingredients": {
+        "Name": "{{Name}}",
+        "Toggle": {{Toggle}},
+        "Number": {{Number}},
+        "Choice": "{{Choice}}"
+    },
+    "BOIL": {
+        "TPLNAME": "{{BOIL.TPLNAME}}"
+    },
+    "RECIPE": {
+        "name": "{{RECIPE.name}}"
+    }
+}

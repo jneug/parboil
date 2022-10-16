@@ -7,7 +7,7 @@ from files or strings.
 
 import os
 import sys
-import typing as t
+from typing import TYPE_CHECKING, Generator, Protocol, Union
 from collections.abc import MutableSequence
 from dataclasses import dataclass
 from functools import cached_property
@@ -21,14 +21,14 @@ from rich import inspect
 
 from .ext import jinja_filter_fileify, jinja_filter_roman, jinja_filter_slugify
 
-if t.TYPE_CHECKING:
+if TYPE_CHECKING:
     from parboil.recipe import Boiler
 
 
-class ParboilRenderable(t.Protocol):
-    """Protocol for classes that can be rendered by ParboilRenderer.render_obj()"""
+class ParboilRenderable(Protocol):
+    """Protocol for classes that can be rendered by [parboil.renderer.ParboilRenderer.render_obj()][]."""
 
-    def __templates__(self) -> t.Generator[str, str, None]:
+    def __templates__(self) -> Generator[str, str, None]:
         ...
 
 
@@ -38,7 +38,7 @@ def renderable(cls=None, *attrs, strict: bool = True, render_empty: bool = False
     def wrapper(cls):
         if not hasattr(cls, "__templates__"):
 
-            def _render(self) -> t.Generator[str, str, None]:
+            def _render(self) -> Generator[str, str, None]:
                 for key in attrs:
                     if hasattr(self, key):
                         val = getattr(self, key, None)
@@ -107,8 +107,8 @@ class ParboilRenderer:
         return self._render_template(self.env.from_string(str(template)), **kwargs)
 
     def render_strings(
-        self, templates: t.MutableSequence[str], **kwargs
-    ) -> t.MutableSequence[str]:
+        self, templates: MutableSequence[str], **kwargs
+    ) -> MutableSequence[str]:
         """Render a sequence of string templates in place."""
         for i, tpl in enumerate(templates):
             templates[i] = self.render_string(tpl, **kwargs)
@@ -126,7 +126,7 @@ class ParboilRenderer:
             templates.close()
 
     def render_file(
-        self, filename: t.Union[str, Path], render_filename: bool = False, **kwargs
+        self, filename: Union[str, Path], render_filename: bool = False, **kwargs
     ) -> str:
         """Renders a file as jinja2 template.
 

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
+"""Handling of recipes.
+
 Classes for handling recipes (boilerplate templates), repositories
 (directories with installed templates) and boilers (projects that compile
-templates into a specific target dir).
+templates into a specific target directory).
 """
 
 
@@ -28,8 +29,6 @@ import jsonc
 from rich import inspect
 
 import parboil.console as console
-from .ingredients import Ingredient, get_ingredient
-from .renderer import ParboilRenderer
 
 from .errors import (
     ProjectError,
@@ -40,20 +39,27 @@ from .errors import (
     TaskFailedError,
 )
 from .helpers import eval_bool, load_files
+from .ingredients import Ingredient, get_ingredient
+from .renderer import ParboilRenderer
 from .settings import META_FILE, PRJ_FILE
 from .tasks import Task
 
 logger = logging.getLogger(__name__)
 
-RESERVED_KEYS = ('_tasks', '_files', '_context', '_settings')
+RESERVED_KEYS = ("_tasks", "_files", "_context", "_settings")
 
 
 @dataclass(init=False)
-class Recipe(object):
-    """
+class Recipe:
+    """Container for recipe information.
+
     Recipes hold information about a template that can be used by parboil
     to generate a project with user answers. The compilation process is handled in
-    a :class:`Boiler` instance.
+    a [parboil.recipes.Boiler][] instance.
+
+    Raises:
+        ProjectFileNotFoundError: In case some mandatory recipe files are missing.
+        ProjectError: Any error related to project initialization.
     """
 
     name: str
@@ -453,15 +459,28 @@ class Repository(Mapping[str, Recipe]):
 
 
 @dataclass
-class Boiler(object):
-    """
-    A Project compiles a `Template` into a `target_dir`.
+class Boiler:
+    """A `Boiler` renders a [Recipe][parboil.recipes.Recipe] into a `target_dir`.
 
     In this process the user may be is prompted for answers to the fields
-    configured in the templates config file.
+    configured in the recipes config file.
+
+    Raises:
+        TaskFailedError: If a task exited with a returncode other than zero.
+        TaskExecutionError: If a task fails execution.
+
+    Attributes:
+        recipe:
+            The recipe this `Boiler` will render.
+        target_dir:
+            Directory the recipe is renderered into.
+        prefilled:
+            A dicttionary with already defined variable values.
+        context:
+            A dictionary with context variables to use for template rendering.
     """
 
-    template: Recipe
+    recipe: Recipe
     target_dir: Path
 
     prefilled: t.Dict[str, t.Any]
@@ -471,8 +490,8 @@ class Boiler(object):
         """
         Get field values either from the prefilled values or read user input.
         """
-        for _field in self.template.ingredients:
-            self.renderer.render_obj(_field, FIELD=_field)
+        for _field in self.recipe.ingredients:
+            self.renderer.render_obj(_field, INGREDIENT=_field)
 
             if not eval_bool(_field.condition or True):
                 console.info(
@@ -481,23 +500,30 @@ class Boiler(object):
                 continue
             elif _field.name in self.prefilled:
                 self.context[_field.name] = _field.value = self.renderer.render_string(
-                    self.prefilled[_field.name], FIELD=_field
+                    self.prefilled[_field.name], INGREDIENT=_field
                 )
                 console.info(f'Used prefilled value for "[field]{_field.name}[/]"')
             else:
                 self.context[_field.name] = _field.prompt(self)
 
-        for key, descr in self.template.context.items():
+        for key, descr in self.recipe.context.items():
             self.context[key] = self.renderer.render_string(descr)
 
-    def compile(self) -> t.Generator[t.Tuple[bool, str, str], None, None]:
-        """
-        Attempts to compile every file in self.templates with jinja and to save it to its final location in the output folder.
+    def compile(self) -> t.Generator[t.Tuple[bool, Path, t.Optional[Path]], None, None]:
+        """Compile the recipe into the target directory.
+
+        Attempts to compile every file in `self.templates` with [jinja2](#) and to save it to its final location in the target directory.
 
         Yields a tuple with three values for each template file:
-            1. (bool) If an output file was generated
-            2. (str) The original file
-            3. (str) The output file after compilation (if any)
+
+
+
+        Yields:
+            (bool, str, str): A tuple holding
+
+                1. `True`, if an output file was generated, `False` otherwise,
+                2. the original file.
+                3. The output file after compilation or `None`, if no file was rendered.
         """
         ## Create target directory
         self.target_dir.mkdir(parents=True, exist_ok=True)
@@ -506,15 +532,16 @@ class Boiler(object):
         self.execute_tasks("pre-run")
 
         # TODO Error handling
-        for _file in self.template.templates:
+        for _file in self.recipe.templates:
             if isinstance(_file, Recipe):
                 # TODO refactor subproject inclusion (field and compilation to tighly coupled)
                 subproject = Boiler(_file, self.target_dir, self.prefilled)
                 yield from subproject.compile()
             else:
+                _file = Path(_file)
                 file_in = Path(str(_file).removeprefix("includes:"))
                 file_out = str(file_in)
-                file_cfg: t.Dict[str, t.Any] = self.template.files.get(
+                file_cfg: t.Dict[str, t.Any] = self.recipe.files.get(
                     str(file_in), dict()
                 )
                 file_out = file_cfg.get("filename", file_out)
@@ -532,7 +559,7 @@ class Boiler(object):
                 path_render = self.renderer.render_string(file_out, BOIL=boil_vars)
 
                 if Path(path_render).exists() and not file_cfg.get("overwrite", True):
-                    yield (False, str(file_in), "")
+                    yield (False, file_in, None)
                     continue
 
                 boil_vars["FILENAME"] = Path(path_render).name
@@ -542,7 +569,7 @@ class Boiler(object):
                     # Render template
                     tpl_render = self.renderer.render_file(_file, BOIL=boil_vars)
                 else:
-                    tpl_render = self.template.templates_dir.joinpath(_file).read_text()
+                    tpl_render = self.recipe.templates_dir.joinpath(_file).read_text()
 
                 generate_file = bool(tpl_render.strip())  # empty?
                 generate_file = file_cfg.get("keep", generate_file)
@@ -552,20 +579,20 @@ class Boiler(object):
                     path_render_abs.parent.mkdir(parents=True, exist_ok=True)
                     path_render_abs.write_text(tpl_render)
 
-                    yield (True, str(_file), path_render)
+                    yield (True, _file, Path(path_render))
                 else:
-                    yield (False, str(_file), path_render)
+                    yield (False, _file, Path(path_render))
 
         # Execute post-run tasks
         self.execute_tasks("post-run")
 
     def execute_tasks(self, hook: str) -> None:
-        if hook not in self.template.tasks:
+        if hook not in self.recipe.tasks:
             return
 
-        total_tasks = len(self.template.tasks[hook])
+        total_tasks = len(self.recipe.tasks[hook])
         with self.cwd():
-            for i, task in enumerate(self.template.tasks[hook]):
+            for i, task in enumerate(self.recipe.tasks[hook]):
                 self.renderer.render_obj(task, TASK=task)
                 console.info(
                     f"Running [keyword]{hook}[/] task {i+1} of {total_tasks}: [cmd]{task}[/]"

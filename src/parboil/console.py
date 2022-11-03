@@ -59,7 +59,8 @@ out = Console(theme=THEME)
 
 def decoration(decor: str) -> str:
     """Creates a decoration for a message shown to the user."""
-    return f"\[[{decor}.label]{DECORATIONS[decor]}[/{decor}.label]]"
+    # return f"\[[{decor}.label]{DECORATIONS[decor]}[/{decor}.label]]"
+    return f"  [{decor}.label]{DECORATIONS[decor]}[/{decor}.label]  "
 
 
 def clear():

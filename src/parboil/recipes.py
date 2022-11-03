@@ -495,14 +495,14 @@ class Boiler:
 
             if not eval_bool(_field.condition or True):
                 console.info(
-                    f'Skipped field "[field]{_field.name}[/]" due to failed condition'
+                    f'Skipped field "[ingredient]{_field.name}[/]" due to failed condition'
                 )
                 continue
             elif _field.name in self.prefilled:
                 self.context[_field.name] = _field.value = self.renderer.render_string(
                     self.prefilled[_field.name], INGREDIENT=_field
                 )
-                console.info(f'Used prefilled value for "[field]{_field.name}[/]"')
+                console.info(f'Used prefilled value for "[ingredient]{_field.name}[/]"')
             else:
                 self.context[_field.name] = _field.prompt(self)
 

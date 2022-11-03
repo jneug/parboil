@@ -7,11 +7,11 @@ from files or strings.
 
 import os
 import sys
-from typing import TYPE_CHECKING, Generator, Protocol, Union
 from collections.abc import MutableSequence
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
+from typing import TYPE_CHECKING, Generator, Protocol, Union
 
 import jinja2_ansible_filters
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader

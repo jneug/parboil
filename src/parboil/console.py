@@ -110,13 +110,13 @@ def prompt(
         out.print(_msg)
 
     if type is int:
-        return IntPrompt(msg[-1], console=out, password=secret)(default=default)  # type: ignore
+        return IntPrompt(msg[-1], console=out, password=secret)(default=default or ...)  # type: ignore
     elif type is float:
-        return FloatPrompt(msg[-1], console=out, password=secret)(default=default)  # type: ignore
+        return FloatPrompt(msg[-1], console=out, password=secret)(default=default or ...)  # type: ignore
     elif type is bool:
         return Confirm(msg[-1], console=out, password=secret)(default=default)  # type: ignore
     else:
-        return Prompt(msg[-1], console=out, password=secret)(default=default)  # type: ignore
+        return Prompt(msg[-1], console=out, password=secret)(default=default or ...)  # type: ignore
 
 
 def question(msg: t.Union[str, t.List[str]], key: str, default: t.Any = ...) -> str:
@@ -136,7 +136,7 @@ def question_int(msg: t.Union[str, t.List[str]], key: str, default: t.Any = ...)
 
 
 def confirm(msg: t.Union[str, t.List[str]], default: t.Any = ...) -> bool:
-    return prompt(bool, msg, default=default)
+    return bool(prompt(bool, msg, default=bool(default)))
 
 
 def choice(

@@ -28,6 +28,7 @@ MSG_DEFAULT = 'Enter a value for "[ingredient]{{INGREDIENT.name}}[/]"'
 MSG_CHOICE = 'Chose a value for "[ingredient]{{INGREDIENT.name}}[/]"'
 MSG_DISABLE = 'Do you want do [italic]disable[/] "[ingredient]{{INGREDIENT.name}}[/]"'
 MSG_ENABLE = 'Do you want do [italic]enable[/] "[ingredient]{{INGREDIENT.name}}[/]"'
+MSG_CONFIRM = 'Do you want do [italic]enable[/] "[ingredient]{{INGREDIENT.name}}[/]"'
 
 
 def get_ingredient(name: str, definition: t.Dict[t.Any, t.Any]) -> "Ingredient":
@@ -58,6 +59,8 @@ def get_ingredient(name: str, definition: t.Dict[t.Any, t.Any]) -> "Ingredient":
         _c = definition.get("choices", None)
         if isinstance(_d, bool):
             field_type = "confirm"
+        if isinstance(_d, int):
+            definition["type"] = "int"
         elif isinstance(_c, list):
             field_type = "choice"
         elif isinstance(_c, dict):
@@ -130,32 +133,44 @@ class Ingredient(t.Generic[VTYPE]):
     def _prompt(self, boiler: "Boiler") -> None:
         """Actually prompt the user for an answer and store the
         result in `self.value`."""
-        self.value = console.question(
-            self.help,
-            key=self.name,
-            default=self.default,
-        )
+        if self.type == "int":
+            self.value = console.question_int(
+                self.help,
+                key=self.name,
+                default=self.default,
+            )
+        else:
+            self.value = console.question(
+                self.help,
+                key=self.name,
+                default=self.default,
+            )
 
 
 class ConfirmIngredient(Ingredient):
     def __init__(self, name, **kwargs):
-        if bool(getattr(kwargs, "default", False)):
-            self.help = MSG_DISABLE
-        else:
-            self.help = MSG_ENABLE
+        # if bool(getattr(kwargs, "default", False)):
+        #     self.help = MSG_DISABLE
+        # else:
+        #     self.help = MSG_ENABLE
+        self.help = MSG_CONFIRM
         super().__init__(name, **kwargs)
 
     def _prompt(self, boiler: "Boiler") -> None:
-        if bool(self.default):
-            self.value = not console.confirm(
-                self.help,
-                default=True,
-            )
-        else:
-            self.value = console.confirm(
-                self.help,
-                default=False,
-            )
+        self.value = console.confirm(
+            self.help,
+            default=bool(self.default),
+        )
+        # if bool(self.default):
+        #     self.value = not console.confirm(
+        #         self.help,
+        #         default=True,
+        #     )
+        # else:
+        #     self.value = console.confirm(
+        #         self.help,
+        #         default=False,
+        #     )
 
 
 class ChoiceIngredient(Ingredient):
@@ -167,7 +182,7 @@ class ChoiceIngredient(Ingredient):
         super().__init__(name, **kwargs)
 
     def __templates__(self) -> t.Generator[str, str, None]:
-        super().__templates__()
+        yield from super().__templates__()
         for i, choice in enumerate(self.choices):
             self._choices[i] = yield choice
 

@@ -12,6 +12,40 @@ With _Parboil_ you can create reusable boilerplate templates to kickstart your n
 
 ----
 
+<div data-termynal-container>
+    <div id="termynal" data-termynal data-ty-typeDelay="40" data-ty-lineDelay="1500">
+        <span data-ty="input">pipx install parboil</span>
+        <span data-ty="progress"></span>
+        <span data-ty-delay="0" data-ty>Successfully installed parboil</span>
+        <span data-ty-delay="0" data-ty></span>
+        <span data-ty="input" data-ty-delay="1800">boil install -d jneug/parboil-license</span>
+        <span data-ty-delay="0" data-ty>[<span class="ty-success">✓</span>] Installed recipe <span class="ty-recipe">parboil-license</span></span>
+		<span data-ty-delay="0" data-ty>[<span class="ty-info">i</span>]</span>
+    	<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;Use with <span class="ty-cmd">boil use parboil-license</span></span>
+		<span data-ty></span>
+		<span data-ty="input">boil use parboil-license</span>
+		<!-- -->
+		<span data-ty-delay="0" data-ty>[<span class="ty-success">i</span>] Used prefilled value for "<span class="ty-ingredient">Author</span>"</span>
+		<span data-ty-delay="0" data-ty>[<span class="ty-success">i</span>] Used prefilled value for "<span class="ty-ingredient">Email</span>"</span>
+		<!-- -->
+		<span data-ty>[<span class="ty-question">?</span>] Enter a value for "<span class="ty-ingredient">Year</span>" <span class="ty-default">(2022)</span>:</span>
+		<!-- -->
+		<span data-ty-delay="0" data-ty>[<span class="ty-question">?</span>] Choose a value for "<span class="ty-ingredient">License</span>"</span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">1</span> - <span class="ty-keyword">Apache License 2.0</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">2</span> - <span class="ty-keyword">MIT</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">3</span> - <span class="ty-keyword">ISC</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">4</span> - <span class="ty-keyword">GNU GPL v3.0</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">5</span> - <span class="ty-keyword">GNU GPL v2.0</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">6</span> - <span class="ty-keyword">CC-BY 4.0</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">7</span> - <span class="ty-keyword">CC-BY-SA 4.0</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ty-input">8</span> - <span class="ty-keyword">CC-0 1.0</span></span>
+		<span data-ty-delay="0" data-ty>&nbsp;&nbsp;&nbsp;&nbsp;Select from <span class="ty-input">1..9</span></span>
+		<span data-ty="input">2</span>
+		<!-- -->
+		<span data-ty>[<span class="ty-success">i</span>] Generated project for recipe "<span class="ty-recipe">parboil-license</span>" in <span class="ty-path">/Users/xyz/Projects/foo</span></span>
+    </div>
+</div>
+
 ## Installation
 
 Install **Python 3** and then _Parboil_ with **pip**:

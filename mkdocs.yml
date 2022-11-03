@@ -22,6 +22,15 @@ theme:
               icon: material/weather-night
               name: Switch to light mode
 
+extra_css:
+    - assets/styles.css
+
+extra_javascript:
+    - assets/termynal.js
+
+watch:
+    - src
+
 nav:
     - Introduction: index.md
     - Overview: overview.md
@@ -63,8 +72,6 @@ plugins:
     - search
     - autorefs
     - mkdocstrings:
-          watch:
-              - src
           handlers:
               python:
                   import:

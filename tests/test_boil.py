@@ -7,7 +7,7 @@ from parboil.version import __version__
 
 
 def test_version():
-    assert __version__ == "0.7.10"
+    assert __version__ == "0.9.1"
 
 
 def test_boil_version(boil_runner):

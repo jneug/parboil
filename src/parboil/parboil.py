@@ -367,8 +367,13 @@ def use(
         out.mkdir(parents=True)
         console.success(f"Created [path]{out}[/]")
 
+    ## Prepare prefilled values
+    prefilled = cfg.get("prefilled", dict())
+    for key, val in value:
+        prefilled[key] = val
+
     ## Prepare project and read user answers
-    project = Boiler(_recipe, out, cfg["prefilled"] if "prefilled" in cfg else dict())
+    project = Boiler(_recipe, out, prefilled)
     project.fill()
 
     for success, file_in, file_out in project.compile():

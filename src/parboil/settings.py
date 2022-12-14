@@ -56,13 +56,3 @@ LOGGING_CONFIG = {
     },
     "root": {"level": "INFO", "handlers": ["logfile"]},
 }
-
-if __name__ == "__main__":
-    import tomli
-    from rich import inspect
-
-    with open(
-        "/Users/jneug/Projekte/Skripte/parboil/tests/templates/docs/parboil.toml", "rb"
-    ) as toml:
-        config = tomli.load(toml)
-        inspect(config)

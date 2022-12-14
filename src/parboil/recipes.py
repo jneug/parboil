@@ -538,6 +538,7 @@ class Boiler:
                 subproject = Boiler(_file, self.target_dir, self.prefilled)
                 yield from subproject.compile()
             else:
+                logger.debug("  Working on file [path]%s[/]", _file)
                 _file = Path(_file)
                 file_in = Path(str(_file).removeprefix("includes:"))
                 file_out = str(file_in)
@@ -557,8 +558,22 @@ class Boiler:
                     OUTNAME=str(self.target_dir.name),
                 )
                 path_render = self.renderer.render_string(file_out, BOIL=boil_vars)
+                logger.debug("    Filename rendererd to [path]%s[/] ✓", path_render)
 
+                # Is file excluded?
+                if file_cfg.get("exclude", False):
+                    logger.debug(
+                        "    [path]%s[/] is excluded from rendering", path_render
+                    )
+                    yield (False, file_in, None)
+                    continue
+
+                # Should existsing file be overwritten?
                 if Path(path_render).exists() and not file_cfg.get("overwrite", True):
+                    logger.debug(
+                        "    [path]%s[/] exists and will not be overwritten",
+                        path_render,
+                    )
                     yield (False, file_in, None)
                     continue
 
@@ -590,6 +605,7 @@ class Boiler:
         if hook not in self.recipe.tasks:
             return
 
+        logger.debug("  Executing %s hook..", hook)
         total_tasks = len(self.recipe.tasks[hook])
         with self.cwd():
             for i, task in enumerate(self.recipe.tasks[hook]):
@@ -602,6 +618,7 @@ class Boiler:
                         raise TaskFailedError(task)
                 except Exception as e:
                     raise TaskExecutionError(task) from e
+        logger.debug("    done  ✓")
 
     @cached_property
     def renderer(self) -> ParboilRenderer:

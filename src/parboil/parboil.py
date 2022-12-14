@@ -27,6 +27,7 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.tree import Tree
+from rich import inspect
 
 import parboil.console as console
 from parboil import __version__
@@ -34,7 +35,7 @@ from parboil import __version__
 from .errors import ProjectError, ProjectExistsError, ProjectFileNotFoundError
 from .ext import pass_tpldir
 from .recipes import Boiler, Recipe, Repository
-from .settings import CFG_DIR, CFG_FILE, LOGGING_CONFIG, TPL_DIR
+from .settings import CFG_DIR, CFG_FILE, LOGGING_CONFIG, TPL_DIR, DEFAULT_CONFIG
 
 logger = logging.getLogger("parboil")
 
@@ -80,6 +81,8 @@ def boil(
     )
 
     # Load config file
+    ctx.obj = {**ctx.obj, **DEFAULT_CONFIG}
+
     if config:
         try:
             user_cfg = jsonc.load(config)
@@ -340,13 +343,15 @@ def use(
     Otherwise the cwd is used.
     """
     cfg = ctx.obj
+    logger.debug("Using recipe [recipe]%s[/]..", recipe)
 
-    # Check teamplate and read configuration
+    # Check template and read configuration
     repo = Repository(cfg["TPLDIR"])
     _recipe = repo.get_recipe(recipe)
 
     try:
         _recipe.load()
+        logger.debug("  Recipe loaded  ✓")
     except FileNotFoundError:
         console.warn(f"No valid recipe found for name [recipe]{recipe}[/]")
         ctx.exit(1)
@@ -368,15 +373,31 @@ def use(
         console.success(f"Created [path]{out}[/]")
 
     ## Prepare prefilled values
-    prefilled = cfg.get("prefilled", dict())
+    prefilled = cfg["prefilled"] if "prefilled" in cfg else dict()
     for key, val in value:
         prefilled[key] = val
 
     ## Prepare project and read user answers
     project = Boiler(_recipe, out, prefilled)
     project.fill()
+    logger.debug("  All ingredients filled  ✓")
+
+    ## Set excludes
+    logger.debug("  Setting excludes")
+    patterns = cfg["exclude"] if "exclude" in cfg else list()
+    for pattern in patterns:
+        logger.debug("    Glob pattern %s", pattern)
+        files = _recipe.templates_dir.glob(pattern)
+        for filepath in files:
+            filename = str(filepath.relative_to(_recipe.templates_dir))
+            _recipe.files[filename] = {
+                "exclude": True,
+                **_recipe.files.get(filename, dict()),
+            }
+            logger.debug("    Added [path]%s[/] to excludes", filename)
 
     for success, file_in, file_out in project.compile():
+        logger.info("%s -> %s (%s)", file_in, file_out, success)
         if success:
             console.success(f"Created [path]{file_out}[/]")
         else:

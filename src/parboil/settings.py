@@ -13,6 +13,8 @@ META_FILE = ".parboil"
 
 ERROR_LOG_FILENAME = CFG_DIR / "parboil-errors.log"
 
+DEFAULT_CONFIG = {"exclude": ["**/.DS_Store", "**/Thumbs.db"]}
+
 LOGGING_CONFIG = {
     "version": 1,
     "disable_existing_loggers": False,

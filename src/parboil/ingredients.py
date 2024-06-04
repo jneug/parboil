@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 import click
 import rich
 import rich.prompt
-from colorama import Back, Fore, Style
 from rich import inspect
 
 import parboil.console as console

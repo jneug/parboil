@@ -21,7 +21,6 @@ from pathlib import Path
 import click
 import jsonc
 import rich
-from colorama import Back, Fore, Style
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader, PrefixLoader
 from rich.panel import Panel
 from rich.syntax import Syntax

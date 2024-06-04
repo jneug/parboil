@@ -1,3 +1,7 @@
+## Version 0.9.3
+
+- Updated dependencies
+
 ### Version 0.7.7
 
 - Moved to Poetry for project management
